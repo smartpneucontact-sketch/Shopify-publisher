@@ -414,11 +414,11 @@
     // ── TIRES PAGE ──────────────────────────────────────────────────
     async function renderTires(el) {
       el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}${statCard("",null)}${statCard("",null)}${statCard("",null)}</div>
-        <div style="text-align:center;padding:60px;color:var(--text-tertiary)"><span class="pulse">Loading tires with metafields...</span></div>`;
+        <div style="text-align:center;padding:60px;color:var(--text-tertiary)"><span class="pulse">Loading all products with metafields — this may take a moment...</span></div>`;
 
       try {
         const [pRes, cRes] = await Promise.all([
-          apiFetch("/api/products/with-metafields?limit=50"),
+          apiFetch("/api/products/with-metafields"),
           apiFetch("/api/products/count"),
         ]);
         state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));

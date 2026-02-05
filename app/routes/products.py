@@ -26,12 +26,10 @@ async def list_products(
 
 
 @router.get("/with-metafields")
-async def list_products_with_metafields(
-    limit: int = Query(50, ge=1, le=250),
-):
-    """Get all products with their metafields and images."""
+async def list_products_with_metafields():
+    """Get ALL products with their metafields and images."""
     try:
-        products = await shopify_client.get_products_with_metafields(limit=limit)
+        products = await shopify_client.get_products_with_metafields()
         return {"products": products}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

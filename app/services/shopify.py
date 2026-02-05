@@ -23,7 +23,7 @@ class ShopifyAdminClient:
         json_body: Optional[dict] = None,
     ) -> dict[str, Any]:
         url = f"{self.base_url}/{endpoint}"
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=120) as client:
             response = await client.request(
                 method=method,
                 url=url,
@@ -106,22 +106,50 @@ class ShopifyAdminClient:
     async def get_product_metafields(self, product_id: int) -> dict:
         return await self._request("GET", f"products/{product_id}/metafields.json")
 
-    async def get_products_with_metafields(self, limit: int = 50) -> list:
-        """Fetch products then batch-fetch all their metafields."""
+    async def get_all_products(self) -> list:
+        """Fetch ALL products using since_id pagination (250 per page)."""
+        all_products = []
+        since_id = 0
+        async with httpx.AsyncClient(timeout=120, headers=self.headers) as client:
+            while True:
+                resp = await client.get(
+                    f"{self.base_url}/products.json",
+                    params={"limit": 250, "since_id": since_id}
+                )
+                resp.raise_for_status()
+                batch = resp.json().get("products", [])
+                if not batch:
+                    break
+                all_products.extend(batch)
+                since_id = batch[-1]["id"]
+                if len(batch) < 250:
+                    break
+        return all_products
+
+    async def get_products_with_metafields(self) -> list:
+        """Fetch ALL products then batch-fetch all their metafields."""
         import asyncio
-        products_data = await self.get_products(limit=limit)
-        products = products_data.get("products", [])
+        products = await self.get_all_products()
 
-        async def enrich(product):
-            try:
-                mf_data = await self.get_product_metafields(product["id"])
-                product["metafields"] = mf_data.get("metafields", [])
-            except Exception:
-                product["metafields"] = []
-            return product
+        BATCH_SIZE = 20
 
-        enriched = await asyncio.gather(*[enrich(p) for p in products])
-        return list(enriched)
+        async with httpx.AsyncClient(timeout=120, headers=self.headers) as client:
+            async def enrich(product):
+                try:
+                    resp = await client.get(
+                        f"{self.base_url}/products/{product['id']}/metafields.json"
+                    )
+                    resp.raise_for_status()
+                    product["metafields"] = resp.json().get("metafields", [])
+                except Exception:
+                    product["metafields"] = []
+                return product
+
+            for i in range(0, len(products), BATCH_SIZE):
+                batch = products[i:i + BATCH_SIZE]
+                await asyncio.gather(*[enrich(p) for p in batch])
+
+        return products
 
 
 # Singleton

@@ -221,6 +221,7 @@
     const state = {
       page: "settings",
       apiUrl: "",
+      connected: false,
       products: [],
       filters: { search: "", brand: "", season: "", condition: "", size: "" },
     };
@@ -263,8 +264,8 @@
 
     // ── API ─────────────────────────────────────────────────────────
     async function apiFetch(endpoint) {
-      if (!state.apiUrl) throw new Error("No API URL");
-      const res = await fetch(state.apiUrl.replace(/\/$/, "") + endpoint);
+      const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
+      const res = await fetch(base + endpoint);
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
     }
@@ -353,11 +354,11 @@
         <div class="nav-item ${state.page === p.id ? 'active' : ''}" onclick="navigate('${p.id}')">
           ${ICONS[p.icon]}
           <span>${p.label}</span>
-          ${p.id === 'settings' && !state.apiUrl ? '<span class="nav-badge nav-warn">!</span>' : ''}
+          ${p.id === 'settings' && !state.connected ? '<span class="nav-badge nav-warn">!</span>' : ''}
         </div>
       `).join("");
       document.getElementById("sidebar-host").textContent =
-        state.apiUrl ? new URL(state.apiUrl).host : "not connected";
+        state.connected ? (state.apiUrl ? new URL(state.apiUrl).host : window.location.host) : "not connected";
     }
 
     function renderTopbar() {
@@ -370,7 +371,7 @@
 
     function renderContent() {
       const el = document.getElementById("content");
-      if (!state.apiUrl && state.page !== "settings") {
+      if (!state.connected && state.page !== "settings") {
         el.innerHTML = `<div class="empty-state"><p>Connect your API first in <strong style="color:var(--accent);cursor:pointer" onclick="navigate('settings')">Settings</strong></p></div>`;
         return;
       }
@@ -677,14 +678,15 @@
       s.innerHTML = `<div class="connection-status testing"><span class="pulse">Testing...</span></div>`;
       try {
         const res = await fetch(url + "/health");
-        if (res.ok) { state.apiUrl = url; document.getElementById("sidebar-host").textContent = new URL(url).host; s.innerHTML = `<div class="connection-status connected">${ICONS.check} Connected</div>`; }
+        if (res.ok) { state.apiUrl = url; state.connected = true; document.getElementById("sidebar-host").textContent = url ? new URL(url).host : window.location.host; s.innerHTML = `<div class="connection-status connected">${ICONS.check} Connected</div>`; }
         else s.innerHTML = `<div class="connection-status disconnected">${ICONS.alert} Failed (HTTP ${res.status})</div>`;
       } catch (e) { s.innerHTML = `<div class="connection-status disconnected">${ICONS.alert} Failed — check URL</div>`; }
     }
 
     function saveApiUrl() {
       state.apiUrl = document.getElementById("api-url-input").value.replace(/\/$/, "");
-      document.getElementById("sidebar-host").textContent = state.apiUrl ? new URL(state.apiUrl).host : "not connected";
+      state.connected = true;
+      document.getElementById("sidebar-host").textContent = state.apiUrl ? new URL(state.apiUrl).host : window.location.host;
       navigate("tires");
     }
 
@@ -692,7 +694,13 @@
     async function autoDetect() {
       try {
         const res = await fetch("/health");
-        if (res.ok) { state.apiUrl = window.location.origin; navigate("tires"); return; }
+        if (res.ok) {
+          state.apiUrl = "";
+          state.connected = true;
+          document.getElementById("sidebar-host").textContent = window.location.host;
+          navigate("tires");
+          return;
+        }
       } catch (e) {}
       navigate("settings");
     }

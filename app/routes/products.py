@@ -25,6 +25,18 @@ async def list_products(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/with-metafields")
+async def list_products_with_metafields(
+    limit: int = Query(50, ge=1, le=250),
+):
+    """Get all products with their metafields and images."""
+    try:
+        products = await shopify_client.get_products_with_metafields(limit=limit)
+        return {"products": products}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/count")
 async def product_count():
     """Get total product count."""
@@ -41,3 +53,12 @@ async def get_product(product_id: int):
         return await shopify_client.get_product(product_id)
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
+
+
+@router.get("/{product_id}/metafields")
+async def get_product_metafields(product_id: int):
+    """Get metafields for a single product."""
+    try:
+        return await shopify_client.get_product_metafields(product_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Metafields for product {product_id} not found")

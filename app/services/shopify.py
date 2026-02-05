@@ -102,6 +102,27 @@ class ShopifyAdminClient:
     async def get_locations(self) -> dict:
         return await self._request("GET", "locations.json")
 
+    # ── Metafields ───────────────────────────────────────────────────
+    async def get_product_metafields(self, product_id: int) -> dict:
+        return await self._request("GET", f"products/{product_id}/metafields.json")
+
+    async def get_products_with_metafields(self, limit: int = 50) -> list:
+        """Fetch products then batch-fetch all their metafields."""
+        import asyncio
+        products_data = await self.get_products(limit=limit)
+        products = products_data.get("products", [])
+
+        async def enrich(product):
+            try:
+                mf_data = await self.get_product_metafields(product["id"])
+                product["metafields"] = mf_data.get("metafields", [])
+            except Exception:
+                product["metafields"] = []
+            return product
+
+        enriched = await asyncio.gather(*[enrich(p) for p in products])
+        return list(enriched)
+
 
 # Singleton
 shopify_client = ShopifyAdminClient()

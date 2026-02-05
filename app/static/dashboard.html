@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Shopify Admin Dashboard</title>
+  <title>Tire Admin Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
@@ -25,67 +25,34 @@
       --warning: #f59e0b;
       --danger: #ef4444;
       --info: #3b82f6;
+      --winter: #60a5fa;
+      --summer: #fb923c;
+      --allseason: #a78bfa;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'DM Sans', sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      -webkit-font-smoothing: antialiased;
-    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg-primary); color: var(--text-primary); -webkit-font-smoothing: antialiased; }
     .dashboard { display: flex; height: 100vh; overflow: hidden; }
 
     /* Sidebar */
-    .sidebar {
-      width: 240px; background: var(--bg-secondary);
-      border-right: 1px solid var(--border-subtle);
-      display: flex; flex-direction: column; flex-shrink: 0;
-    }
+    .sidebar { width: 240px; background: var(--bg-secondary); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; flex-shrink: 0; }
     .sidebar-brand { padding: 24px 20px 20px; border-bottom: 1px solid var(--border-subtle); }
     .sidebar-brand h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
-    .sidebar-brand .host {
-      font-size: 11px; color: var(--text-tertiary);
-      font-family: 'JetBrains Mono', monospace; margin-top: 4px;
-    }
+    .sidebar-brand .host { font-size: 11px; color: var(--text-tertiary); font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
     .sidebar-nav { padding: 12px 10px; flex: 1; }
-    .nav-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px; border-radius: 8px; cursor: pointer;
-      font-size: 13.5px; color: var(--text-secondary);
-      transition: all 0.15s ease; margin-bottom: 2px;
-      border: 1px solid transparent;
-    }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: var(--text-secondary); transition: all 0.15s ease; margin-bottom: 2px; border: 1px solid transparent; }
     .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
-    .nav-item.active {
-      background: var(--accent-dim); color: var(--accent);
-      font-weight: 500; border-color: var(--accent-mid);
-    }
+    .nav-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 500; border-color: var(--accent-mid); }
     .nav-item.active svg { stroke: var(--accent); }
-    .nav-badge {
-      margin-left: auto; background: var(--bg-elevated);
-      color: var(--text-tertiary); font-size: 11px;
-      font-family: 'JetBrains Mono', monospace;
-      padding: 2px 7px; border-radius: 4px;
-    }
+    .nav-badge { margin-left: auto; background: var(--bg-elevated); color: var(--text-tertiary); font-size: 11px; font-family: 'JetBrains Mono', monospace; padding: 2px 7px; border-radius: 4px; }
     .nav-item.active .nav-badge { background: var(--accent-mid); color: var(--accent); }
     .nav-warn { background: #ef444430 !important; color: var(--danger) !important; }
 
     /* Main */
     .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    .topbar {
-      padding: 18px 28px; border-bottom: 1px solid var(--border-subtle);
-      display: flex; align-items: center; justify-content: space-between;
-      background: var(--bg-secondary);
-    }
+    .topbar { padding: 18px 28px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: var(--bg-secondary); }
     .topbar h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.4px; }
     .topbar-actions { display: flex; gap: 8px; }
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border);
-      background: var(--bg-tertiary); color: var(--text-secondary);
-      font-size: 12.5px; font-family: 'DM Sans', sans-serif;
-      font-weight: 500; cursor: pointer; transition: all 0.15s ease;
-    }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: 12.5px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
     .btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--text-tertiary); }
     .btn-accent { background: var(--accent); color: #0a0a0b; border-color: var(--accent); }
     .btn-accent:hover { background: #b8ee00; color: #0a0a0b; }
@@ -93,60 +60,97 @@
 
     /* Stats */
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
-    .stat-card {
-      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-      border-radius: 10px; padding: 18px 20px; transition: border-color 0.2s;
-    }
+    .stat-card { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 18px 20px; transition: border-color 0.2s; }
     .stat-card:hover { border-color: var(--border); }
-    .stat-label {
-      font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.8px;
-      color: var(--text-tertiary); font-weight: 500; margin-bottom: 8px;
-    }
-    .stat-value {
-      font-size: 28px; font-weight: 700; letter-spacing: -1px;
-      font-family: 'JetBrains Mono', monospace;
-    }
+    .stat-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-tertiary); font-weight: 500; margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -1px; font-family: 'JetBrains Mono', monospace; }
     .stat-value.accent { color: var(--accent); }
 
-    /* Table */
-    .table-container {
-      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-      border-radius: 10px; overflow: hidden;
+    /* Filters Bar */
+    .filters-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-group label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-tertiary); font-weight: 500; }
+    .filter-select, .filter-input {
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 7px;
+      padding: 7px 10px; color: var(--text-primary); font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px; outline: none; transition: border-color 0.15s; min-width: 130px;
     }
-    .table-header {
-      padding: 14px 20px; border-bottom: 1px solid var(--border-subtle);
-      display: flex; align-items: center; justify-content: space-between;
-    }
+    .filter-select:focus, .filter-input:focus { border-color: var(--accent); }
+    .filter-select option { background: var(--bg-tertiary); }
+    .filter-input::placeholder { color: var(--text-tertiary); }
+    .filter-reset { margin-top: 16px; }
+
+    /* Tire Cards */
+    .tire-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+    .tire-card { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; overflow: hidden; transition: border-color 0.2s, transform 0.2s; cursor: pointer; }
+    .tire-card:hover { border-color: var(--border); transform: translateY(-2px); }
+    .tire-card-images { display: flex; gap: 2px; height: 180px; overflow: hidden; background: var(--bg-tertiary); }
+    .tire-card-images img { flex: 1; object-fit: cover; min-width: 0; transition: opacity 0.2s; }
+    .tire-card-images img:hover { opacity: 0.85; }
+    .tire-card-images .no-img { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); font-size: 12px; }
+    .tire-card-body { padding: 16px; }
+    .tire-card-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.2px; }
+    .tire-card-subtitle { font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; }
+    .tire-card-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+    .tire-meta-item { display: flex; flex-direction: column; }
+    .tire-meta-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-tertiary); font-weight: 500; }
+    .tire-meta-value { font-size: 12.5px; color: var(--text-secondary); font-weight: 500; margin-top: 1px; }
+    .tire-meta-value.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+    /* Season badge */
+    .season-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .season-badge.winter { background: #60a5fa20; color: var(--winter); }
+    .season-badge.summer { background: #fb923c20; color: var(--summer); }
+    .season-badge.all-season, .season-badge.allseason, .season-badge.all_season { background: #a78bfa20; color: var(--allseason); }
+
+    /* Tread depth bar */
+    .tread-bar { display: flex; align-items: center; gap: 8px; }
+    .tread-bar-track { flex: 1; height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; max-width: 80px; }
+    .tread-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .tread-bar-fill.good { background: var(--success); }
+    .tread-bar-fill.fair { background: var(--warning); }
+    .tread-bar-fill.low { background: var(--danger); }
+
+    /* Condition badge */
+    .condition-badge { display: inline-flex; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .condition-badge.excellent, .condition-badge.a { background: #22c55e18; color: var(--success); }
+    .condition-badge.good, .condition-badge.b { background: #c8ff0018; color: var(--accent); }
+    .condition-badge.fair, .condition-badge.c { background: #f59e0b18; color: var(--warning); }
+    .condition-badge.poor, .condition-badge.d { background: #ef444418; color: var(--danger); }
+
+    /* Detail modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 14px; max-width: 700px; width: 95%; max-height: 85vh; overflow-y: auto; }
+    .modal-images { display: flex; gap: 2px; height: 260px; overflow: hidden; background: var(--bg-tertiary); }
+    .modal-images img { flex: 1; object-fit: cover; min-width: 0; }
+    .modal-body { padding: 24px; }
+    .modal-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
+    .modal-subtitle { font-size: 13px; color: var(--text-tertiary); font-family: 'JetBrains Mono', monospace; margin-bottom: 20px; }
+    .modal-meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .modal-meta-item { background: var(--bg-tertiary); border-radius: 8px; padding: 12px 14px; }
+    .modal-meta-item .tire-meta-label { margin-bottom: 4px; }
+    .modal-meta-item .tire-meta-value { font-size: 14px; }
+    .modal-close { position: absolute; top: 16px; right: 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; }
+    .modal-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+    /* Table (for orders/customers/inventory) */
+    .table-container { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; }
+    .table-header { padding: 14px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; }
     .table-header h3 { font-size: 13.5px; font-weight: 600; }
-    .search-box {
-      display: flex; align-items: center; gap: 6px;
-      background: var(--bg-tertiary); border: 1px solid var(--border);
-      border-radius: 6px; padding: 6px 10px;
-    }
-    .search-box input {
-      background: transparent; border: none; outline: none;
-      color: var(--text-primary); font-family: 'DM Sans', sans-serif;
-      font-size: 12.5px; width: 180px;
-    }
+    .search-box { display: flex; align-items: center; gap: 6px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; }
+    .search-box input { background: transparent; border: none; outline: none; color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 12.5px; width: 180px; }
     .search-box input::placeholder { color: var(--text-tertiary); }
     .search-box svg { color: var(--text-tertiary); flex-shrink: 0; }
     table { width: 100%; border-collapse: collapse; }
-    thead th {
-      text-align: left; padding: 10px 20px; font-size: 11px;
-      text-transform: uppercase; letter-spacing: 0.7px;
-      color: var(--text-tertiary); font-weight: 500;
-      border-bottom: 1px solid var(--border-subtle); background: var(--bg-tertiary);
-    }
+    thead th { text-align: left; padding: 10px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-tertiary); font-weight: 500; border-bottom: 1px solid var(--border-subtle); background: var(--bg-tertiary); }
     tbody tr { border-bottom: 1px solid var(--border-subtle); transition: background 0.1s; }
     tbody tr:hover { background: var(--bg-tertiary); }
     tbody tr:last-child { border-bottom: none; }
     tbody td { padding: 12px 20px; font-size: 13px; color: var(--text-secondary); }
     tbody td:first-child { color: var(--text-primary); font-weight: 500; }
     .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-    .status-badge {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 500;
-    }
+    .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 500; }
     .status-badge.active, .status-badge.open, .status-badge.fulfilled, .status-badge.paid { background: #22c55e18; color: var(--success); }
     .status-badge.draft, .status-badge.closed, .status-badge.unfulfilled { background: #8b8b9418; color: var(--text-tertiary); }
     .status-badge.cancelled, .status-badge.refunded { background: #ef444418; color: var(--danger); }
@@ -154,32 +158,16 @@
 
     /* Settings */
     .settings-panel { max-width: 560px; }
-    .settings-group {
-      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-      border-radius: 10px; padding: 24px; margin-bottom: 16px;
-    }
+    .settings-group { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 24px; margin-bottom: 16px; }
     .settings-group h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
     .field { margin-bottom: 14px; }
     .field:last-child { margin-bottom: 0; }
-    .field label {
-      display: block; font-size: 11.5px; text-transform: uppercase;
-      letter-spacing: 0.7px; color: var(--text-tertiary);
-      font-weight: 500; margin-bottom: 6px;
-    }
-    .field input {
-      width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border);
-      border-radius: 7px; padding: 9px 12px; color: var(--text-primary);
-      font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
-      outline: none; transition: border-color 0.15s;
-    }
+    .field label { display: block; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-tertiary); font-weight: 500; margin-bottom: 6px; }
+    .field input { width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 7px; padding: 9px 12px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 12.5px; outline: none; transition: border-color 0.15s; }
     .field input:focus { border-color: var(--accent); }
     .field input::placeholder { color: var(--text-tertiary); }
     .field .hint { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
-    .connection-status {
-      display: flex; align-items: center; gap: 8px;
-      padding: 12px 16px; border-radius: 8px;
-      font-size: 12.5px; font-weight: 500; margin-top: 16px;
-    }
+    .connection-status { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 8px; font-size: 12.5px; font-weight: 500; margin-top: 16px; }
     .connection-status.connected { background: #22c55e14; color: var(--success); border: 1px solid #22c55e30; }
     .connection-status.disconnected { background: #ef444414; color: var(--danger); border: 1px solid #ef444430; }
     .connection-status.testing { background: #3b82f614; color: var(--info); border: 1px solid #3b82f630; }
@@ -198,21 +186,20 @@
       .sidebar-brand h1, .sidebar-brand .host, .nav-item span, .nav-badge { display: none; }
       .nav-item { justify-content: center; padding: 10px; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .tire-grid { grid-template-columns: 1fr; }
+      .modal-meta-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body>
-  <div class="dashboard" id="app">
-    <!-- Sidebar -->
+  <div class="dashboard">
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <h1>⚡ Shopify Admin</h1>
+        <h1>🛞 Tire Admin</h1>
         <div class="host" id="sidebar-host">not connected</div>
       </div>
       <nav class="sidebar-nav" id="sidebar-nav"></nav>
     </aside>
-
-    <!-- Main -->
     <div class="main-content">
       <div class="topbar">
         <h2 id="page-title">Settings</h2>
@@ -222,18 +209,40 @@
     </div>
   </div>
 
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" id="modal-content" style="position:relative">
+      <div class="modal-close" onclick="closeModal()">✕</div>
+    </div>
+  </div>
+
   <script>
     // ── State ───────────────────────────────────────────────────────
     const state = {
       page: "settings",
       apiUrl: "",
-      data: { products: [], orders: [], customers: [], locations: [] },
-      counts: { products: null, orders: null, customers: null },
-      loading: false,
+      products: [],
+      filters: { search: "", brand: "", season: "", condition: "", size: "" },
     };
 
+    // Known metafield keys to look for (Shopify stores them with namespace.key)
+    const TIRE_FIELDS = [
+      { key: "brand", label: "Brand" },
+      { key: "size", label: "Size" },
+      { key: "width", label: "Width" },
+      { key: "rim_diameter", label: "Rim" },
+      { key: "season", label: "Season" },
+      { key: "tread_depth", label: "Tread Depth" },
+      { key: "condition", label: "Condition" },
+      { key: "dot_date", label: "DOT Date" },
+      { key: "load_index", label: "Load Index" },
+      { key: "speed_rating", label: "Speed Rating" },
+      { key: "price_per_tire", label: "Price/Tire" },
+      { key: "quantity", label: "Qty" },
+    ];
+
     const PAGES = [
-      { id: "products", label: "Products", icon: "package" },
+      { id: "tires", label: "Tires", icon: "tire" },
       { id: "orders", label: "Orders", icon: "shopping-bag" },
       { id: "customers", label: "Customers", icon: "users" },
       { id: "inventory", label: "Inventory", icon: "box" },
@@ -241,7 +250,7 @@
     ];
 
     const ICONS = {
-      "package": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`,
+      "tire": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="22"/><line x1="2" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="22" y2="12"/></svg>`,
       "shopping-bag": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>`,
       "users": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`,
       "box": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`,
@@ -255,25 +264,79 @@
     // ── API ─────────────────────────────────────────────────────────
     async function apiFetch(endpoint) {
       if (!state.apiUrl) throw new Error("No API URL");
-      const base = state.apiUrl.replace(/\/$/, "");
-      const res = await fetch(base + endpoint);
+      const res = await fetch(state.apiUrl.replace(/\/$/, "") + endpoint);
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
     }
 
-    // ── Auto-detect API URL ─────────────────────────────────────────
-    async function autoDetectApi() {
-      // If served from FastAPI, the API is on the same origin
-      try {
-        const res = await fetch("/health");
-        if (res.ok) {
-          state.apiUrl = window.location.origin;
-          document.getElementById("sidebar-host").textContent = window.location.host;
-          navigate("products");
-          return;
-        }
-      } catch (e) {}
-      navigate("settings");
+    // ── Metafield helpers ───────────────────────────────────────────
+    function getMeta(product, fieldKey) {
+      if (!product.metafields) return null;
+      const mf = product.metafields.find(m =>
+        m.key === fieldKey || m.key.endsWith("_" + fieldKey) ||
+        m.key.replace(/-/g, "_").includes(fieldKey.replace(/-/g, "_"))
+      );
+      return mf ? mf.value : null;
+    }
+
+    function getMetaAll(product) {
+      const result = {};
+      for (const f of TIRE_FIELDS) {
+        result[f.key] = getMeta(product, f.key);
+      }
+      // Also try from product title/vendor as fallback
+      if (!result.brand && product.vendor) result.brand = product.vendor;
+      return result;
+    }
+
+    // ── Rendering helpers ───────────────────────────────────────────
+    function seasonBadge(season) {
+      if (!season) return '<span class="tire-meta-value">—</span>';
+      const s = season.toLowerCase().replace(/[\s-]/g, "");
+      let cls = "all-season";
+      if (s.includes("winter") || s.includes("hiver")) cls = "winter";
+      else if (s.includes("summer") || s.includes("été") || s.includes("ete")) cls = "summer";
+      const icons = { winter: "❄️", summer: "☀️", "all-season": "🔄" };
+      return `<span class="season-badge ${cls}">${icons[cls] || "🔄"} ${season}</span>`;
+    }
+
+    function conditionBadge(cond) {
+      if (!cond) return "—";
+      const c = cond.toLowerCase().trim();
+      let cls = "fair";
+      if (c === "a" || c.includes("excellent") || c.includes("new")) cls = "excellent";
+      else if (c === "b" || c.includes("good") || c.includes("bon")) cls = "good";
+      else if (c === "c" || c.includes("fair") || c.includes("moyen")) cls = "fair";
+      else if (c === "d" || c.includes("poor") || c.includes("mauvais")) cls = "poor";
+      return `<span class="condition-badge ${cls}">${cond}</span>`;
+    }
+
+    function treadDepthBar(depth) {
+      if (!depth) return "—";
+      const num = parseFloat(depth);
+      if (isNaN(num)) return depth;
+      // Assume max tread ~10mm for used tires
+      const pct = Math.min(100, (num / 10) * 100);
+      let cls = "good";
+      if (pct < 30) cls = "low";
+      else if (pct < 60) cls = "fair";
+      return `<div class="tread-bar">
+        <div class="tread-bar-track"><div class="tread-bar-fill ${cls}" style="width:${pct}%"></div></div>
+        <span class="mono" style="font-size:11px">${num}mm</span>
+      </div>`;
+    }
+
+    function statCard(label, value, accent) {
+      const v = value === null || value === undefined ? '<span class="pulse">—</span>' : value;
+      return `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value ${accent ? 'accent' : ''}">${v}</div></div>`;
+    }
+
+    function statusBadge(s) {
+      return `<span class="status-badge ${(s||"unknown").toLowerCase().replace(/\s/g,"")}">${s||"unknown"}</span>`;
+    }
+
+    function money(val) {
+      return "$" + parseFloat(val || 0).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     // ── Navigation ──────────────────────────────────────────────────
@@ -298,33 +361,21 @@
     }
 
     function renderTopbar() {
-      const title = PAGES.find(p => p.id === state.page)?.label || "";
-      document.getElementById("page-title").textContent = title;
+      document.getElementById("page-title").textContent = PAGES.find(p => p.id === state.page)?.label || "";
       const actions = document.getElementById("topbar-actions");
-      if (state.page !== "settings") {
-        actions.innerHTML = `<button class="btn" onclick="refreshPage()">${ICONS.refresh} Refresh</button>`;
-      } else {
-        actions.innerHTML = "";
-      }
+      actions.innerHTML = state.page !== "settings"
+        ? `<button class="btn" onclick="renderContent()">${ICONS.refresh} Refresh</button>`
+        : "";
     }
 
-    function refreshPage() {
-      renderContent();
-    }
-
-    // ── Content Rendering ───────────────────────────────────────────
     function renderContent() {
       const el = document.getElementById("content");
       if (!state.apiUrl && state.page !== "settings") {
-        el.innerHTML = `
-          <div class="empty-state">
-            <p style="font-size:32px;opacity:0.3;margin-bottom:12px">${ICONS.alert}</p>
-            <p>Connect your API first in <strong style="color:var(--accent);cursor:pointer" onclick="navigate('settings')">Settings</strong></p>
-          </div>`;
+        el.innerHTML = `<div class="empty-state"><p>Connect your API first in <strong style="color:var(--accent);cursor:pointer" onclick="navigate('settings')">Settings</strong></p></div>`;
         return;
       }
       switch (state.page) {
-        case "products": return renderProducts(el);
+        case "tires": return renderTires(el);
         case "orders": return renderOrders(el);
         case "customers": return renderCustomers(el);
         case "inventory": return renderInventory(el);
@@ -332,234 +383,265 @@
       }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────
-    function statusBadge(s) {
-      const cls = (s || "unknown").toLowerCase().replace(/\s/g, "");
-      return `<span class="status-badge ${cls}">${s || "unknown"}</span>`;
-    }
-
-    function statCard(label, value, accent) {
-      const v = value === null || value === undefined
-        ? '<span class="pulse">—</span>'
-        : value;
-      return `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value ${accent ? 'accent' : ''}">${v}</div></div>`;
-    }
-
-    function money(val) {
-      return "$" + parseFloat(val || 0).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    // ── Products Page ───────────────────────────────────────────────
-    async function renderProducts(el) {
-      el.innerHTML = `
-        <div class="stats-grid">${statCard("Total Products", null, true)}${statCard("Loading...", null)}${statCard("", null)}${statCard("", null)}</div>
-        <div class="table-container"><div class="table-header"><h3>Products</h3></div>
-        <table><tbody><tr><td colspan="5" class="loading-cell"><span class="pulse">Loading products...</span></td></tr></tbody></table></div>`;
+    // ── TIRES PAGE ──────────────────────────────────────────────────
+    async function renderTires(el) {
+      el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}${statCard("",null)}${statCard("",null)}${statCard("",null)}</div>
+        <div style="text-align:center;padding:60px;color:var(--text-tertiary)"><span class="pulse">Loading tires with metafields...</span></div>`;
 
       try {
         const [pRes, cRes] = await Promise.all([
-          apiFetch("/api/products?limit=50"),
+          apiFetch("/api/products/with-metafields?limit=50"),
           apiFetch("/api/products/count"),
         ]);
-        const products = pRes.products || [];
+        state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));
         const count = cRes.count ?? 0;
-        const active = products.filter(p => p.status === "active").length;
-        const draft = products.filter(p => p.status === "draft").length;
-        const vendors = [...new Set(products.map(p => p.vendor).filter(Boolean))].length;
+
+        // Extract unique values for filters
+        const brands = [...new Set(state.products.map(p => p._meta.brand).filter(Boolean))].sort();
+        const seasons = [...new Set(state.products.map(p => p._meta.season).filter(Boolean))].sort();
+        const conditions = [...new Set(state.products.map(p => p._meta.condition).filter(Boolean))].sort();
+        const sizes = [...new Set(state.products.map(p => p._meta.size).filter(Boolean))].sort();
+
+        const avgTread = state.products.reduce((s, p) => {
+          const d = parseFloat(p._meta.tread_depth);
+          return isNaN(d) ? s : { sum: s.sum + d, n: s.n + 1 };
+        }, { sum: 0, n: 0 });
 
         el.innerHTML = `
           <div class="stats-grid fade-in">
-            ${statCard("Total Products", count, true)}
-            ${statCard("Active", active)}
-            ${statCard("Draft", draft)}
-            ${statCard("Vendors", vendors)}
+            ${statCard("Total Tires", count, true)}
+            ${statCard("Brands", brands.length)}
+            ${statCard("Avg. Tread", avgTread.n ? (avgTread.sum / avgTread.n).toFixed(1) + "mm" : "—")}
+            ${statCard("Active", state.products.filter(p => p.status === "active").length)}
           </div>
-          <div class="table-container fade-in">
-            <div class="table-header">
-              <h3>Products</h3>
-              <div class="search-box">${ICONS.search}<input placeholder="Search products..." oninput="filterProducts(this.value)" /></div>
-            </div>
-            <table>
-              <thead><tr><th>Product</th><th>Status</th><th>Vendor</th><th>Type</th><th>Variants</th></tr></thead>
-              <tbody id="products-tbody"></tbody>
-            </table>
-          </div>`;
 
-        state.data.products = products;
-        filterProducts("");
+          <div class="filters-bar fade-in">
+            <div class="filter-group">
+              <label>Search</label>
+              <input class="filter-input" placeholder="Title, size..." oninput="state.filters.search=this.value;renderTireGrid()" />
+            </div>
+            <div class="filter-group">
+              <label>Brand</label>
+              <select class="filter-select" onchange="state.filters.brand=this.value;renderTireGrid()">
+                <option value="">All Brands</option>
+                ${brands.map(b => `<option value="${b}">${b}</option>`).join("")}
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Season</label>
+              <select class="filter-select" onchange="state.filters.season=this.value;renderTireGrid()">
+                <option value="">All Seasons</option>
+                ${seasons.map(s => `<option value="${s}">${s}</option>`).join("")}
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Condition</label>
+              <select class="filter-select" onchange="state.filters.condition=this.value;renderTireGrid()">
+                <option value="">All Conditions</option>
+                ${conditions.map(c => `<option value="${c}">${c}</option>`).join("")}
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Size</label>
+              <select class="filter-select" onchange="state.filters.size=this.value;renderTireGrid()">
+                <option value="">All Sizes</option>
+                ${sizes.map(s => `<option value="${s}">${s}</option>`).join("")}
+              </select>
+            </div>
+            <div class="filter-group">
+              <button class="btn filter-reset" onclick="resetFilters()">Reset</button>
+            </div>
+          </div>
+
+          <div id="tire-grid-container" class="fade-in"></div>`;
+
+        renderTireGrid();
       } catch (e) {
-        el.innerHTML = `<div class="empty-state"><p>Error loading products: ${e.message}</p></div>`;
+        el.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
       }
     }
 
-    function filterProducts(query) {
-      const tbody = document.getElementById("products-tbody");
-      if (!tbody) return;
-      const q = query.toLowerCase();
-      const filtered = state.data.products.filter(p => (p.title || "").toLowerCase().includes(q));
+    function renderTireGrid() {
+      const container = document.getElementById("tire-grid-container");
+      if (!container) return;
+
+      const f = state.filters;
+      const filtered = state.products.filter(p => {
+        const m = p._meta;
+        if (f.search) {
+          const q = f.search.toLowerCase();
+          const searchable = `${p.title} ${m.brand} ${m.size} ${m.season} ${m.width}`.toLowerCase();
+          if (!searchable.includes(q)) return false;
+        }
+        if (f.brand && m.brand !== f.brand) return false;
+        if (f.season && m.season !== f.season) return false;
+        if (f.condition && m.condition !== f.condition) return false;
+        if (f.size && m.size !== f.size) return false;
+        return true;
+      });
+
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="loading-cell">No products found</td></tr>`;
+        container.innerHTML = `<div class="empty-state"><p>No tires match your filters</p></div>`;
         return;
       }
-      tbody.innerHTML = filtered.map(p => `
-        <tr>
-          <td>${p.title}</td>
-          <td>${statusBadge(p.status)}</td>
-          <td>${p.vendor || "—"}</td>
-          <td>${p.product_type || "—"}</td>
-          <td class="mono">${p.variants?.length || 0}</td>
-        </tr>`).join("");
+
+      container.innerHTML = `
+        <div style="margin-bottom:12px;font-size:12px;color:var(--text-tertiary)">${filtered.length} tire${filtered.length !== 1 ? 's' : ''} found</div>
+        <div class="tire-grid">
+          ${filtered.map((p, i) => tireCard(p, i)).join("")}
+        </div>`;
     }
 
-    // ── Orders Page ─────────────────────────────────────────────────
-    async function renderOrders(el) {
-      el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div>
-        <div class="table-container"><table><tbody><tr><td colspan="6" class="loading-cell"><span class="pulse">Loading orders...</span></td></tr></tbody></table></div>`;
+    function tireCard(p, idx) {
+      const m = p._meta;
+      const images = (p.images || []).slice(0, 3);
+      const imgHtml = images.length > 0
+        ? images.map(img => `<img src="${img.src}" alt="${p.title}" loading="lazy" />`).join("")
+        : `<div class="no-img">No images</div>`;
 
+      const price = p.variants?.[0]?.price || m.price_per_tire;
+
+      return `
+        <div class="tire-card" onclick="openModal(${idx})">
+          <div class="tire-card-images">${imgHtml}</div>
+          <div class="tire-card-body">
+            <div class="tire-card-title">${p.title}</div>
+            <div class="tire-card-subtitle">${m.size || ""} ${m.brand ? "· " + m.brand : ""} ${price ? "· " + money(price) : ""}</div>
+            <div class="tire-card-meta">
+              <div class="tire-meta-item">
+                <span class="tire-meta-label">Season</span>
+                ${seasonBadge(m.season)}
+              </div>
+              <div class="tire-meta-item">
+                <span class="tire-meta-label">Condition</span>
+                <span class="tire-meta-value">${conditionBadge(m.condition)}</span>
+              </div>
+              <div class="tire-meta-item">
+                <span class="tire-meta-label">Tread</span>
+                <span class="tire-meta-value">${treadDepthBar(m.tread_depth)}</span>
+              </div>
+              <div class="tire-meta-item">
+                <span class="tire-meta-label">DOT</span>
+                <span class="tire-meta-value mono">${m.dot_date || "—"}</span>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function resetFilters() {
+      state.filters = { search: "", brand: "", season: "", condition: "", size: "" };
+      document.querySelectorAll(".filter-select").forEach(s => s.value = "");
+      document.querySelectorAll(".filter-input").forEach(i => i.value = "");
+      renderTireGrid();
+    }
+
+    // ── Detail Modal ────────────────────────────────────────────────
+    function openModal(idx) {
+      const filtered = getFilteredProducts();
+      const p = filtered[idx];
+      if (!p) return;
+      const m = p._meta;
+      const images = (p.images || []).slice(0, 3);
+      const imgHtml = images.length > 0
+        ? images.map(img => `<img src="${img.src}" alt="${p.title}" />`).join("")
+        : `<div class="no-img" style="height:260px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary)">No images</div>`;
+
+      const price = p.variants?.[0]?.price || m.price_per_tire;
+
+      const modal = document.getElementById("modal-content");
+      modal.innerHTML = `
+        <div class="modal-close" onclick="closeModal()">✕</div>
+        <div class="modal-images">${imgHtml}</div>
+        <div class="modal-body">
+          <div class="modal-title">${p.title}</div>
+          <div class="modal-subtitle">${m.size || ""} ${m.brand ? "· " + m.brand : ""} ${price ? "· " + money(price) : ""}</div>
+          <div class="modal-meta-grid">
+            ${TIRE_FIELDS.map(f => `
+              <div class="modal-meta-item">
+                <span class="tire-meta-label">${f.label}</span>
+                <span class="tire-meta-value${['dot_date','load_index','speed_rating','width','rim_diameter','quantity'].includes(f.key) ? ' mono' : ''}">
+                  ${f.key === 'season' ? seasonBadge(m[f.key]) :
+                    f.key === 'condition' ? conditionBadge(m[f.key]) :
+                    f.key === 'tread_depth' ? treadDepthBar(m[f.key]) :
+                    f.key === 'price_per_tire' ? (m[f.key] ? money(m[f.key]) : price ? money(price) : "—") :
+                    m[f.key] || "—"}
+                </span>
+              </div>
+            `).join("")}
+          </div>
+          ${p.body_html ? `<div style="margin-top:20px;font-size:13px;color:var(--text-secondary);line-height:1.6;border-top:1px solid var(--border-subtle);padding-top:16px">${p.body_html}</div>` : ""}
+        </div>`;
+
+      document.getElementById("modal-overlay").classList.add("open");
+    }
+
+    function getFilteredProducts() {
+      const f = state.filters;
+      return state.products.filter(p => {
+        const m = p._meta;
+        if (f.search) { const q = f.search.toLowerCase(); if (!`${p.title} ${m.brand} ${m.size} ${m.season} ${m.width}`.toLowerCase().includes(q)) return false; }
+        if (f.brand && m.brand !== f.brand) return false;
+        if (f.season && m.season !== f.season) return false;
+        if (f.condition && m.condition !== f.condition) return false;
+        if (f.size && m.size !== f.size) return false;
+        return true;
+      });
+    }
+
+    function closeModal() {
+      document.getElementById("modal-overlay").classList.remove("open");
+    }
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+    // ── Orders / Customers / Inventory (unchanged) ──────────────────
+    async function renderOrders(el) {
+      el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div><div class="table-container"><table><tbody><tr><td colspan="6" class="loading-cell"><span class="pulse">Loading orders...</span></td></tr></tbody></table></div>`;
       try {
-        const [oRes, cRes] = await Promise.all([
-          apiFetch("/api/orders?limit=50&status=any"),
-          apiFetch("/api/orders/count"),
-        ]);
-        const orders = oRes.orders || [];
-        const count = cRes.count ?? 0;
+        const [oRes, cRes] = await Promise.all([apiFetch("/api/orders?limit=50&status=any"), apiFetch("/api/orders/count")]);
+        const orders = oRes.orders || []; const count = cRes.count ?? 0;
         const paid = orders.filter(o => o.financial_status === "paid").length;
         const revenue = orders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0);
-        const avg = orders.length ? revenue / orders.length : 0;
-
         el.innerHTML = `
-          <div class="stats-grid fade-in">
-            ${statCard("Total Orders", count, true)}
-            ${statCard("Paid", paid)}
-            ${statCard("Revenue", money(revenue))}
-            ${statCard("Avg. Order", money(avg))}
-          </div>
-          <div class="table-container fade-in">
-            <div class="table-header"><h3>Recent Orders</h3></div>
-            <table>
-              <thead><tr><th>Order</th><th>Customer</th><th>Fulfillment</th><th>Payment</th><th>Total</th><th>Date</th></tr></thead>
-              <tbody>${orders.length === 0
-                ? `<tr><td colspan="6" class="loading-cell">No orders found</td></tr>`
-                : orders.map(o => `
-                  <tr>
-                    <td class="mono">${o.name}</td>
-                    <td>${o.customer ? (o.customer.first_name || "") + " " + (o.customer.last_name || "") : o.email || "—"}</td>
-                    <td>${statusBadge(o.fulfillment_status || "unfulfilled")}</td>
-                    <td>${statusBadge(o.financial_status)}</td>
-                    <td class="mono">${money(o.total_price)}</td>
-                    <td>${new Date(o.created_at).toLocaleDateString()}</td>
-                  </tr>`).join("")}
-              </tbody>
-            </table>
-          </div>`;
-      } catch (e) {
-        el.innerHTML = `<div class="empty-state"><p>Error loading orders: ${e.message}</p></div>`;
-      }
+          <div class="stats-grid fade-in">${statCard("Total Orders", count, true)}${statCard("Paid", paid)}${statCard("Revenue", money(revenue))}${statCard("Avg. Order", orders.length ? money(revenue / orders.length) : "—")}</div>
+          <div class="table-container fade-in"><div class="table-header"><h3>Recent Orders</h3></div>
+          <table><thead><tr><th>Order</th><th>Customer</th><th>Fulfillment</th><th>Payment</th><th>Total</th><th>Date</th></tr></thead>
+          <tbody>${orders.length === 0 ? '<tr><td colspan="6" class="loading-cell">No orders</td></tr>' :
+            orders.map(o => `<tr><td class="mono">${o.name}</td><td>${o.customer ? (o.customer.first_name||"")+" "+(o.customer.last_name||"") : o.email||"—"}</td><td>${statusBadge(o.fulfillment_status||"unfulfilled")}</td><td>${statusBadge(o.financial_status)}</td><td class="mono">${money(o.total_price)}</td><td>${new Date(o.created_at).toLocaleDateString()}</td></tr>`).join("")}
+          </tbody></table></div>`;
+      } catch (e) { el.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
     }
 
-    // ── Customers Page ──────────────────────────────────────────────
     async function renderCustomers(el) {
-      el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div>
-        <div class="table-container"><table><tbody><tr><td colspan="5" class="loading-cell"><span class="pulse">Loading customers...</span></td></tr></tbody></table></div>`;
-
+      el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div><div class="table-container"><table><tbody><tr><td colspan="5" class="loading-cell"><span class="pulse">Loading...</span></td></tr></tbody></table></div>`;
       try {
-        const [cRes, countRes] = await Promise.all([
-          apiFetch("/api/customers?limit=50"),
-          apiFetch("/api/customers/count"),
-        ]);
-        const customers = cRes.customers || [];
-        const count = countRes.count ?? 0;
-        const withOrders = customers.filter(c => c.orders_count > 0).length;
+        const [cRes, countRes] = await Promise.all([apiFetch("/api/customers?limit=50"), apiFetch("/api/customers/count")]);
+        const customers = cRes.customers || []; const count = countRes.count ?? 0;
         const totalSpent = customers.reduce((s, c) => s + parseFloat(c.total_spent || 0), 0);
-        const avg = customers.length ? totalSpent / customers.length : 0;
-
         el.innerHTML = `
-          <div class="stats-grid fade-in">
-            ${statCard("Total Customers", count, true)}
-            ${statCard("With Orders", withOrders)}
-            ${statCard("Total Spent", money(totalSpent))}
-            ${statCard("Avg. Spent", money(avg))}
-          </div>
-          <div class="table-container fade-in">
-            <div class="table-header">
-              <h3>Customers</h3>
-              <div class="search-box">${ICONS.search}<input placeholder="Search customers..." oninput="filterCustomers(this.value)" /></div>
-            </div>
-            <table>
-              <thead><tr><th>Name</th><th>Email</th><th>Orders</th><th>Total Spent</th><th>Location</th></tr></thead>
-              <tbody id="customers-tbody"></tbody>
-            </table>
-          </div>`;
-
-        state.data.customers = customers;
-        filterCustomers("");
-      } catch (e) {
-        el.innerHTML = `<div class="empty-state"><p>Error loading customers: ${e.message}</p></div>`;
-      }
+          <div class="stats-grid fade-in">${statCard("Total Customers", count, true)}${statCard("With Orders", customers.filter(c => c.orders_count > 0).length)}${statCard("Total Spent", money(totalSpent))}${statCard("Avg. Spent", customers.length ? money(totalSpent / customers.length) : "—")}</div>
+          <div class="table-container fade-in"><div class="table-header"><h3>Customers</h3></div>
+          <table><thead><tr><th>Name</th><th>Email</th><th>Orders</th><th>Total Spent</th><th>Location</th></tr></thead>
+          <tbody>${customers.map(c => `<tr><td>${((c.first_name||"")+" "+(c.last_name||"")).trim()||"—"}</td><td>${c.email||"—"}</td><td class="mono">${c.orders_count||0}</td><td class="mono">${money(c.total_spent)}</td><td>${c.default_address ? (c.default_address.city||"")+", "+(c.default_address.country||"") : "—"}</td></tr>`).join("")}
+          </tbody></table></div>`;
+      } catch (e) { el.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
     }
 
-    function filterCustomers(query) {
-      const tbody = document.getElementById("customers-tbody");
-      if (!tbody) return;
-      const q = query.toLowerCase();
-      const filtered = state.data.customers.filter(c => {
-        const s = ((c.first_name||"") + " " + (c.last_name||"") + " " + (c.email||"")).toLowerCase();
-        return s.includes(q);
-      });
-      if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="loading-cell">No customers found</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = filtered.map(c => {
-        const name = ((c.first_name||"") + " " + (c.last_name||"")).trim() || "—";
-        const loc = c.default_address ? (c.default_address.city||"") + ", " + (c.default_address.country||"") : "—";
-        return `<tr>
-          <td>${name}</td>
-          <td>${c.email || "—"}</td>
-          <td class="mono">${c.orders_count || 0}</td>
-          <td class="mono">${money(c.total_spent)}</td>
-          <td>${loc}</td>
-        </tr>`;
-      }).join("");
-    }
-
-    // ── Inventory Page ──────────────────────────────────────────────
     async function renderInventory(el) {
-      el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div>
-        <div class="table-container"><table><tbody><tr><td colspan="5" class="loading-cell"><span class="pulse">Loading locations...</span></td></tr></tbody></table></div>`;
-
+      el.innerHTML = `<div class="table-container"><table><tbody><tr><td colspan="5" class="loading-cell"><span class="pulse">Loading...</span></td></tr></tbody></table></div>`;
       try {
         const res = await apiFetch("/api/inventory/locations");
         const locations = res.locations || [];
-
         el.innerHTML = `
-          <div class="stats-grid fade-in">
-            ${statCard("Locations", locations.length, true)}
-            ${statCard("Active", locations.filter(l => l.active).length)}
-          </div>
-          <div class="table-container fade-in">
-            <div class="table-header"><h3>Inventory Locations</h3></div>
-            <table>
-              <thead><tr><th>Location</th><th>Address</th><th>City</th><th>Country</th><th>Active</th></tr></thead>
-              <tbody>${locations.length === 0
-                ? `<tr><td colspan="5" class="loading-cell">No locations found</td></tr>`
-                : locations.map(l => `
-                  <tr>
-                    <td>${l.name}</td>
-                    <td>${l.address1 || "—"}</td>
-                    <td>${l.city || "—"}</td>
-                    <td>${l.country_name || l.country || "—"}</td>
-                    <td style="color:${l.active ? 'var(--success)' : 'var(--text-tertiary)'}">${l.active ? '✓ Yes' : 'No'}</td>
-                  </tr>`).join("")}
-              </tbody>
-            </table>
-          </div>`;
-      } catch (e) {
-        el.innerHTML = `<div class="empty-state"><p>Error loading inventory: ${e.message}</p></div>`;
-      }
+          <div class="stats-grid fade-in">${statCard("Locations", locations.length, true)}${statCard("Active", locations.filter(l => l.active).length)}</div>
+          <div class="table-container fade-in"><div class="table-header"><h3>Inventory Locations</h3></div>
+          <table><thead><tr><th>Location</th><th>Address</th><th>City</th><th>Country</th><th>Active</th></tr></thead>
+          <tbody>${locations.map(l => `<tr><td>${l.name}</td><td>${l.address1||"—"}</td><td>${l.city||"—"}</td><td>${l.country_name||l.country||"—"}</td><td style="color:${l.active?'var(--success)':'var(--text-tertiary)'}">${l.active?'✓ Yes':'No'}</td></tr>`).join("")}
+          </tbody></table></div>`;
+      } catch (e) { el.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
     }
 
-    // ── Settings Page ───────────────────────────────────────────────
+    // ── Settings ────────────────────────────────────────────────────
     function renderSettings(el) {
       el.innerHTML = `
         <div class="settings-panel fade-in">
@@ -568,7 +650,7 @@
             <div class="field">
               <label>API Base URL</label>
               <input id="api-url-input" value="${state.apiUrl}" placeholder="https://shopify-publisher-production.up.railway.app" />
-              <div class="hint">Your Railway deployment URL — leave empty to auto-detect (same origin)</div>
+              <div class="hint">Leave empty to auto-detect (same origin)</div>
             </div>
             <div style="display:flex;gap:8px;margin-top:16px">
               <button class="btn btn-accent" onclick="testConnection()">Test Connection</button>
@@ -577,9 +659,13 @@
             <div id="connection-status"></div>
           </div>
           <div class="settings-group">
-            <h3>About</h3>
+            <h3>Metafield Mapping</h3>
             <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">
-              Shopify Admin Dashboard — connects to your FastAPI backend to manage products, orders, customers, and inventory via the Shopify Admin API.
+              The dashboard looks for these metafield keys on your products:<br>
+              <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;display:inline-block;margin-top:8px">
+                ${TIRE_FIELDS.map(f => f.key).join(", ")}
+              </code><br><br>
+              Make sure your Shopify metafield keys match (namespace doesn't matter). The dashboard will fuzzy-match keys containing these terms.
             </p>
           </div>
         </div>`;
@@ -587,31 +673,30 @@
 
     async function testConnection() {
       const url = document.getElementById("api-url-input").value.replace(/\/$/, "");
-      const statusEl = document.getElementById("connection-status");
-      statusEl.innerHTML = `<div class="connection-status testing"><span class="pulse">Testing connection...</span></div>`;
+      const s = document.getElementById("connection-status");
+      s.innerHTML = `<div class="connection-status testing"><span class="pulse">Testing...</span></div>`;
       try {
         const res = await fetch(url + "/health");
-        if (res.ok) {
-          state.apiUrl = url;
-          document.getElementById("sidebar-host").textContent = new URL(url).host;
-          statusEl.innerHTML = `<div class="connection-status connected">${ICONS.check} Connected successfully</div>`;
-        } else {
-          statusEl.innerHTML = `<div class="connection-status disconnected">${ICONS.alert} Connection failed (HTTP ${res.status})</div>`;
-        }
-      } catch (e) {
-        statusEl.innerHTML = `<div class="connection-status disconnected">${ICONS.alert} Connection failed — check the URL</div>`;
-      }
+        if (res.ok) { state.apiUrl = url; document.getElementById("sidebar-host").textContent = new URL(url).host; s.innerHTML = `<div class="connection-status connected">${ICONS.check} Connected</div>`; }
+        else s.innerHTML = `<div class="connection-status disconnected">${ICONS.alert} Failed (HTTP ${res.status})</div>`;
+      } catch (e) { s.innerHTML = `<div class="connection-status disconnected">${ICONS.alert} Failed — check URL</div>`; }
     }
 
     function saveApiUrl() {
-      const url = document.getElementById("api-url-input").value.replace(/\/$/, "");
-      state.apiUrl = url;
-      document.getElementById("sidebar-host").textContent = url ? new URL(url).host : "not connected";
-      navigate("products");
+      state.apiUrl = document.getElementById("api-url-input").value.replace(/\/$/, "");
+      document.getElementById("sidebar-host").textContent = state.apiUrl ? new URL(state.apiUrl).host : "not connected";
+      navigate("tires");
     }
 
-    // ── Init ────────────────────────────────────────────────────────
-    autoDetectApi();
+    // ── Auto-detect ─────────────────────────────────────────────────
+    async function autoDetect() {
+      try {
+        const res = await fetch("/health");
+        if (res.ok) { state.apiUrl = window.location.origin; navigate("tires"); return; }
+      } catch (e) {}
+      navigate("settings");
+    }
+    autoDetect();
   </script>
 </body>
 </html>

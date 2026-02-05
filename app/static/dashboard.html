@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shopify Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0a0a0b;
+      --bg-secondary: #111113;
+      --bg-tertiary: #18181b;
+      --bg-elevated: #1e1e22;
+      --bg-hover: #252529;
+      --border: #2a2a2e;
+      --border-subtle: #222225;
+      --text-primary: #f0f0f2;
+      --text-secondary: #8b8b94;
+      --text-tertiary: #5a5a63;
+      --accent: #c8ff00;
+      --accent-dim: #c8ff0018;
+      --accent-mid: #c8ff0040;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --info: #3b82f6;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+    .dashboard { display: flex; height: 100vh; overflow: hidden; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 240px; background: var(--bg-secondary);
+      border-right: 1px solid var(--border-subtle);
+      display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .sidebar-brand { padding: 24px 20px 20px; border-bottom: 1px solid var(--border-subtle); }
+    .sidebar-brand h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+    .sidebar-brand .host {
+      font-size: 11px; color: var(--text-tertiary);
+      font-family: 'JetBrains Mono', monospace; margin-top: 4px;
+    }
+    .sidebar-nav { padding: 12px 10px; flex: 1; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 8px; cursor: pointer;
+      font-size: 13.5px; color: var(--text-secondary);
+      transition: all 0.15s ease; margin-bottom: 2px;
+      border: 1px solid transparent;
+    }
+    .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .nav-item.active {
+      background: var(--accent-dim); color: var(--accent);
+      font-weight: 500; border-color: var(--accent-mid);
+    }
+    .nav-item.active svg { stroke: var(--accent); }
+    .nav-badge {
+      margin-left: auto; background: var(--bg-elevated);
+      color: var(--text-tertiary); font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 2px 7px; border-radius: 4px;
+    }
+    .nav-item.active .nav-badge { background: var(--accent-mid); color: var(--accent); }
+    .nav-warn { background: #ef444430 !important; color: var(--danger) !important; }
+
+    /* Main */
+    .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar {
+      padding: 18px 28px; border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg-secondary);
+    }
+    .topbar h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.4px; }
+    .topbar-actions { display: flex; gap: 8px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--bg-tertiary); color: var(--text-secondary);
+      font-size: 12.5px; font-family: 'DM Sans', sans-serif;
+      font-weight: 500; cursor: pointer; transition: all 0.15s ease;
+    }
+    .btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--text-tertiary); }
+    .btn-accent { background: var(--accent); color: #0a0a0b; border-color: var(--accent); }
+    .btn-accent:hover { background: #b8ee00; color: #0a0a0b; }
+    .content-area { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+      border-radius: 10px; padding: 18px 20px; transition: border-color 0.2s;
+    }
+    .stat-card:hover { border-color: var(--border); }
+    .stat-label {
+      font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.8px;
+      color: var(--text-tertiary); font-weight: 500; margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 28px; font-weight: 700; letter-spacing: -1px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .stat-value.accent { color: var(--accent); }
+
+    /* Table */
+    .table-container {
+      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+      border-radius: 10px; overflow: hidden;
+    }
+    .table-header {
+      padding: 14px 20px; border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .table-header h3 { font-size: 13.5px; font-weight: 600; }
+    .search-box {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 10px;
+    }
+    .search-box input {
+      background: transparent; border: none; outline: none;
+      color: var(--text-primary); font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px; width: 180px;
+    }
+    .search-box input::placeholder { color: var(--text-tertiary); }
+    .search-box svg { color: var(--text-tertiary); flex-shrink: 0; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left; padding: 10px 20px; font-size: 11px;
+      text-transform: uppercase; letter-spacing: 0.7px;
+      color: var(--text-tertiary); font-weight: 500;
+      border-bottom: 1px solid var(--border-subtle); background: var(--bg-tertiary);
+    }
+    tbody tr { border-bottom: 1px solid var(--border-subtle); transition: background 0.1s; }
+    tbody tr:hover { background: var(--bg-tertiary); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td { padding: 12px 20px; font-size: 13px; color: var(--text-secondary); }
+    tbody td:first-child { color: var(--text-primary); font-weight: 500; }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 500;
+    }
+    .status-badge.active, .status-badge.open, .status-badge.fulfilled, .status-badge.paid { background: #22c55e18; color: var(--success); }
+    .status-badge.draft, .status-badge.closed, .status-badge.unfulfilled { background: #8b8b9418; color: var(--text-tertiary); }
+    .status-badge.cancelled, .status-badge.refunded { background: #ef444418; color: var(--danger); }
+    .status-badge.pending, .status-badge.authorized, .status-badge.partial { background: #f59e0b18; color: var(--warning); }
+
+    /* Settings */
+    .settings-panel { max-width: 560px; }
+    .settings-group {
+      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+      border-radius: 10px; padding: 24px; margin-bottom: 16px;
+    }
+    .settings-group h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+    .field { margin-bottom: 14px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: block; font-size: 11.5px; text-transform: uppercase;
+      letter-spacing: 0.7px; color: var(--text-tertiary);
+      font-weight: 500; margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: 7px; padding: 9px 12px; color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+      outline: none; transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .field input::placeholder { color: var(--text-tertiary); }
+    .field .hint { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+    .connection-status {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px; border-radius: 8px;
+      font-size: 12.5px; font-weight: 500; margin-top: 16px;
+    }
+    .connection-status.connected { background: #22c55e14; color: var(--success); border: 1px solid #22c55e30; }
+    .connection-status.disconnected { background: #ef444414; color: var(--danger); border: 1px solid #ef444430; }
+    .connection-status.testing { background: #3b82f614; color: var(--info); border: 1px solid #3b82f630; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-tertiary); }
+    .empty-state p { font-size: 13px; }
+    .loading-cell { text-align: center; padding: 40px !important; color: var(--text-tertiary); font-size: 13px; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .pulse { animation: pulse 2s ease-in-out infinite; }
+
+    @media (max-width: 900px) {
+      .sidebar { width: 56px; }
+      .sidebar-brand h1, .sidebar-brand .host, .nav-item span, .nav-badge { display: none; }
+      .nav-item { justify-content: center; padding: 10px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard" id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <h1>⚡ Shopify Admin</h1>
+        <div class="host" id="sidebar-host">not connected</div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+      <div class="topbar">
+        <h2 id="page-title">Settings</h2>
+        <div class="topbar-actions" id="topbar-actions"></div>
+      </div>
+      <div class="content-area" id="content"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── State ───────────────────────────────────────────────────────
+    const state = {
+      page: "settings",
+      apiUrl: "",
+      data: { products: [], orders: [], customers: [], locations: [] },
+      counts: { products: null, orders: null, customers: null },
+      loading: false,
+    };
+
+    const PAGES = [
+      { id: "products", label: "Products", icon: "package" },
+      { id: "orders", label: "Orders", icon: "shopping-bag" },
+      { id: "customers", label: "Customers", icon: "users" },
+      { id: "inventory", label: "Inventory", icon: "box" },
+      { id: "settings", label: "Settings", icon: "settings" },
+    ];
+
+    const ICONS = {
+      "package": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`,
+      "shopping-bag": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>`,
+      "users": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`,
+      "box": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`,
+      "settings": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>`,
+      "refresh": `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>`,
+      "search": `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+      "check": `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+      "alert": `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+    };
+
+    // ── API ─────────────────────────────────────────────────────────
+    async function apiFetch(endpoint) {
+      if (!state.apiUrl) throw new Error("No API URL");
+      const base = state.apiUrl.replace(/\/$/, "");
+      const res = await fetch(base + endpoint);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }
+
+    // ── Auto-detect API URL ─────────────────────────────────────────
+    async function autoDetectApi() {
+      // If served from FastAPI, the API is on the same origin
+      try {
+        const res = await fetch("/health");
+        if (res.ok) {
+          state.apiUrl = window.location.origin;
+          document.getElementById("sidebar-host").textContent = window.location.host;
+          navigate("products");
+          return;
+        }
+      } catch (e) {}
+      navigate("settings");
+    }
+
+    // ── Navigation ──────────────────────────────────────────────────
+    function navigate(pageId) {
+      state.page = pageId;
+      renderSidebar();
+      renderTopbar();
+      renderContent();
+    }
+
+    function renderSidebar() {
+      const nav = document.getElementById("sidebar-nav");
+      nav.innerHTML = PAGES.map(p => `
+        <div class="nav-item ${state.page === p.id ? 'active' : ''}" onclick="navigate('${p.id}')">
+          ${ICONS[p.icon]}
+          <span>${p.label}</span>
+          ${p.id === 'settings' && !state.apiUrl ? '<span class="nav-badge nav-warn">!</span>' : ''}
+        </div>
+      `).join("");
+      document.getElementById("sidebar-host").textContent =
+        state.apiUrl ? new URL(state.apiUrl).host : "not connected";
+    }
+
+    function renderTopbar() {
+      const title = PAGES.find(p => p.id === state.page)?.label || "";
+      document.getElementById("page-title").textContent = title;
+      const actions = document.getElementById("topbar-actions");
+      if (state.page !== "settings") {
+        actions.innerHTML = `<button class="btn" onclick="refreshPage()">${ICONS.refresh} Refresh</button>`;
+      } else {
+        actions.innerHTML = "";
+      }
+    }
+
+    function refreshPage() {
+      renderContent();
+    }
+
+    // ── Content Rendering ───────────────────────────────────────────
+    function renderContent() {
+      const el = document.getElementById("content");
+      if (!state.apiUrl && state.page !== "settings") {
+        el.innerHTML = `
+          <div class="empty-state">
+            <p style="font-size:32px;opacity:0.3;margin-bottom:12px">${ICONS.alert}</p>
+            <p>Connect your API first in <strong style="color:var(--accent);cursor:pointer" onclick="navigate('settings')">Settings</strong></p>
+          </div>`;
+        return;
+      }
+      switch (state.page) {
+        case "products": return renderProducts(el);
+        case "orders": return renderOrders(el);
+        case "customers": return renderCustomers(el);
+        case "inventory": return renderInventory(el);
+        case "settings": return renderSettings(el);
+      }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────
+    function statusBadge(s) {
+      const cls = (s || "unknown").toLowerCase().replace(/\s/g, "");
+      return `<span class="status-badge ${cls}">${s || "unknown"}</span>`;
+    }
+
+    function statCard(label, value, accent) {
+      const v = value === null || value === undefined
+        ? '<span class="pulse">—</span>'
+        : value;
+      return `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value ${accent ? 'accent' : ''}">${v}</div></div>`;
+    }
+
+    function money(val) {
+      return "$" + parseFloat(val || 0).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // ── Products Page ───────────────────────────────────────────────
+    async function renderProducts(el) {
+      el.innerHTML = `
+        <div class="stats-grid">${statCard("Total Products", null, true)}${statCard("Loading...", null)}${statCard("", null)}${statCard("", null)}</div>
+        <div class="table-container"><div class="table-header"><h3>Products</h3></div>
+        <table><tbody><tr><td colspan="5" class="loading-cell"><span class="pulse">Loading products...</span></td></tr></tbody></table></div>`;
+
+      try {
+        const [pRes, cRes] = await Promise.all([
+          apiFetch("/api/products?limit=50"),
+          apiFetch("/api/products/count"),
+        ]);
+        const products = pRes.products || [];
+        const count = cRes.count ?? 0;
+        const active = products.filter(p => p.status === "active").length;
+        const draft = products.filter(p => p.status === "draft").length;
+        const vendors = [...new Set(products.map(p => p.vendor).filter(Boolean))].length;
+
+        el.innerHTML = `
+          <div class="stats-grid fade-in">
+            ${statCard("Total Products", count, true)}
+            ${statCard("Active", active)}
+            ${statCard("Draft", draft)}
+            ${statCard("Vendors", vendors)}
+          </div>
+          <div class="table-container fade-in">
+            <div class="table-header">
+              <h3>Products</h3>
+              <div class="search-box">${ICONS.search}<input placeholder="Search products..." oninput="filterProducts(this.value)" /></div>
+            </div>
+            <table>
+              <thead><tr><th>Product</th><th>Status</th><th>Vendor</th><th>Type</th><th>Variants</th></tr></thead>
+              <tbody id="products-tbody"></tbody>
+            </table>
+          </div>`;
+
+        state.data.products = products;
+        filterProducts("");
+      } catch (e) {
+        el.innerHTML = `<div class="empty-state"><p>Error loading products: ${e.message}</p></div>`;
+      }
+    }
+
+    function filterProducts(query) {
+      const tbody = document.getElementById("products-tbody");
+      if (!tbody) return;
+      const q = query.toLowerCase();
+      const filtered = state.data.products.filter(p => (p.title || "").toLowerCase().includes(q));
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="loading-cell">No products found</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = filtered.map(p => `
+        <tr>
+          <td>${p.title}</td>
+          <td>${statusBadge(p.status)}</td>
+          <td>${p.vendor || "—"}</td>
+          <td>${p.product_type || "—"}</td>
+          <td class="mono">${p.variants?.length || 0}</td>
+        </tr>`).join("");
+    }
+
+    // ── Orders Page ─────────────────────────────────────────────────
+    async function renderOrders(el) {
+      el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div>
+        <div class="table-container"><table><tbody><tr><td colspan="6" class="loading-cell"><span class="pulse">Loading orders...</span></td></tr></tbody></table></div>`;
+
+      try {
+        const [oRes, cRes] = await Promise.all([
+          apiFetch("/api/orders?limit=50&status=any"),
+          apiFetch("/api/orders/count"),
+        ]);
+        const orders = oRes.orders || [];
+        const count = cRes.count ?? 0;
+        const paid = orders.filter(o => o.financial_status === "paid").length;
+        const revenue = orders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0);
+        const avg = orders.length ? revenue / orders.length : 0;
+
+        el.innerHTML = `
+          <div class="stats-grid fade-in">
+            ${statCard("Total Orders", count, true)}
+            ${statCard("Paid", paid)}
+            ${statCard("Revenue", money(revenue))}
+            ${statCard("Avg. Order", money(avg))}
+          </div>
+          <div class="table-container fade-in">
+            <div class="table-header"><h3>Recent Orders</h3></div>
+            <table>
+              <thead><tr><th>Order</th><th>Customer</th><th>Fulfillment</th><th>Payment</th><th>Total</th><th>Date</th></tr></thead>
+              <tbody>${orders.length === 0
+                ? `<tr><td colspan="6" class="loading-cell">No orders found</td></tr>`
+                : orders.map(o => `
+                  <tr>
+                    <td class="mono">${o.name}</td>
+                    <td>${o.customer ? (o.customer.first_name || "") + " " + (o.customer.last_name || "") : o.email || "—"}</td>
+                    <td>${statusBadge(o.fulfillment_status || "unfulfilled")}</td>
+                    <td>${statusBadge(o.financial_status)}</td>
+                    <td class="mono">${money(o.total_price)}</td>
+                    <td>${new Date(o.created_at).toLocaleDateString()}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (e) {
+        el.innerHTML = `<div class="empty-state"><p>Error loading orders: ${e.message}</p></div>`;
+      }
+    }
+
+    // ── Customers Page ──────────────────────────────────────────────
+    async function renderCustomers(el) {
+      el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div>
+        <div class="table-container"><table><tbody><tr><td colspan="5" class="loading-cell"><span class="pulse">Loading customers...</span></td></tr></tbody></table></div>`;
+
+      try {
+        const [cRes, countRes] = await Promise.all([
+          apiFetch("/api/customers?limit=50"),
+          apiFetch("/api/customers/count"),
+        ]);
+        const customers = cRes.customers || [];
+        const count = countRes.count ?? 0;
+        const withOrders = customers.filter(c => c.orders_count > 0).length;
+        const totalSpent = customers.reduce((s, c) => s + parseFloat(c.total_spent || 0), 0);
+        const avg = customers.length ? totalSpent / customers.length : 0;
+
+        el.innerHTML = `
+          <div class="stats-grid fade-in">
+            ${statCard("Total Customers", count, true)}
+            ${statCard("With Orders", withOrders)}
+            ${statCard("Total Spent", money(totalSpent))}
+            ${statCard("Avg. Spent", money(avg))}
+          </div>
+          <div class="table-container fade-in">
+            <div class="table-header">
+              <h3>Customers</h3>
+              <div class="search-box">${ICONS.search}<input placeholder="Search customers..." oninput="filterCustomers(this.value)" /></div>
+            </div>
+            <table>
+              <thead><tr><th>Name</th><th>Email</th><th>Orders</th><th>Total Spent</th><th>Location</th></tr></thead>
+              <tbody id="customers-tbody"></tbody>
+            </table>
+          </div>`;
+
+        state.data.customers = customers;
+        filterCustomers("");
+      } catch (e) {
+        el.innerHTML = `<div class="empty-state"><p>Error loading customers: ${e.message}</p></div>`;
+      }
+    }
+
+    function filterCustomers(query) {
+      const tbody = document.getElementById("customers-tbody");
+      if (!tbody) return;
+      const q = query.toLowerCase();
+      const filtered = state.data.customers.filter(c => {
+        const s = ((c.first_name||"") + " " + (c.last_name||"") + " " + (c.email||"")).toLowerCase();
+        return s.includes(q);
+      });
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="loading-cell">No customers found</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = filtered.map(c => {
+        const name = ((c.first_name||"") + " " + (c.last_name||"")).trim() || "—";
+        const loc = c.default_address ? (c.default_address.city||"") + ", " + (c.default_address.country||"") : "—";
+        return `<tr>
+          <td>${name}</td>
+          <td>${c.email || "—"}</td>
+          <td class="mono">${c.orders_count || 0}</td>
+          <td class="mono">${money(c.total_spent)}</td>
+          <td>${loc}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    // ── Inventory Page ──────────────────────────────────────────────
+    async function renderInventory(el) {
+      el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div>
+        <div class="table-container"><table><tbody><tr><td colspan="5" class="loading-cell"><span class="pulse">Loading locations...</span></td></tr></tbody></table></div>`;
+
+      try {
+        const res = await apiFetch("/api/inventory/locations");
+        const locations = res.locations || [];
+
+        el.innerHTML = `
+          <div class="stats-grid fade-in">
+            ${statCard("Locations", locations.length, true)}
+            ${statCard("Active", locations.filter(l => l.active).length)}
+          </div>
+          <div class="table-container fade-in">
+            <div class="table-header"><h3>Inventory Locations</h3></div>
+            <table>
+              <thead><tr><th>Location</th><th>Address</th><th>City</th><th>Country</th><th>Active</th></tr></thead>
+              <tbody>${locations.length === 0
+                ? `<tr><td colspan="5" class="loading-cell">No locations found</td></tr>`
+                : locations.map(l => `
+                  <tr>
+                    <td>${l.name}</td>
+                    <td>${l.address1 || "—"}</td>
+                    <td>${l.city || "—"}</td>
+                    <td>${l.country_name || l.country || "—"}</td>
+                    <td style="color:${l.active ? 'var(--success)' : 'var(--text-tertiary)'}">${l.active ? '✓ Yes' : 'No'}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (e) {
+        el.innerHTML = `<div class="empty-state"><p>Error loading inventory: ${e.message}</p></div>`;
+      }
+    }
+
+    // ── Settings Page ───────────────────────────────────────────────
+    function renderSettings(el) {
+      el.innerHTML = `
+        <div class="settings-panel fade-in">
+          <div class="settings-group">
+            <h3>API Connection</h3>
+            <div class="field">
+              <label>API Base URL</label>
+              <input id="api-url-input" value="${state.apiUrl}" placeholder="https://shopify-publisher-production.up.railway.app" />
+              <div class="hint">Your Railway deployment URL — leave empty to auto-detect (same origin)</div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button class="btn btn-accent" onclick="testConnection()">Test Connection</button>
+              <button class="btn" onclick="saveApiUrl()">Save</button>
+            </div>
+            <div id="connection-status"></div>
+          </div>
+          <div class="settings-group">
+            <h3>About</h3>
+            <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">
+              Shopify Admin Dashboard — connects to your FastAPI backend to manage products, orders, customers, and inventory via the Shopify Admin API.
+            </p>
+          </div>
+        </div>`;
+    }
+
+    async function testConnection() {
+      const url = document.getElementById("api-url-input").value.replace(/\/$/, "");
+      const statusEl = document.getElementById("connection-status");
+      statusEl.innerHTML = `<div class="connection-status testing"><span class="pulse">Testing connection...</span></div>`;
+      try {
+        const res = await fetch(url + "/health");
+        if (res.ok) {
+          state.apiUrl = url;
+          document.getElementById("sidebar-host").textContent = new URL(url).host;
+          statusEl.innerHTML = `<div class="connection-status connected">${ICONS.check} Connected successfully</div>`;
+        } else {
+          statusEl.innerHTML = `<div class="connection-status disconnected">${ICONS.alert} Connection failed (HTTP ${res.status})</div>`;
+        }
+      } catch (e) {
+        statusEl.innerHTML = `<div class="connection-status disconnected">${ICONS.alert} Connection failed — check the URL</div>`;
+      }
+    }
+
+    function saveApiUrl() {
+      const url = document.getElementById("api-url-input").value.replace(/\/$/, "");
+      state.apiUrl = url;
+      document.getElementById("sidebar-host").textContent = url ? new URL(url).host : "not connected";
+      navigate("products");
+    }
+
+    // ── Init ────────────────────────────────────────────────────────
+    autoDetectApi();
+  </script>
+</body>
+</html>

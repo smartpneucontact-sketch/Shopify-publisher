@@ -3,18 +3,24 @@ Shopify Headless App — FastAPI
 Works on localhost and Railway.
 """
 
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.routes import products, orders, customers, inventory, health
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"🚀 Starting Shopify App ({settings.ENVIRONMENT})")
     print(f"   Shop: {settings.SHOPIFY_STORE_DOMAIN}")
+    print(f"   Dashboard: /dashboard")
     yield
     print("👋 Shutting down...")
 
@@ -52,5 +58,13 @@ async def root():
     return {
         "app": "Shopify Headless App",
         "environment": settings.ENVIRONMENT,
+        "dashboard": "/dashboard",
         "docs": "/docs",
     }
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    """Serve the admin dashboard."""
+    html_file = STATIC_DIR / "dashboard.html"
+    return HTMLResponse(content=html_file.read_text(), status_code=200)

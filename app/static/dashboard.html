@@ -84,10 +84,36 @@
     .tire-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
     .tire-card { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; overflow: hidden; transition: border-color 0.2s, transform 0.2s; cursor: pointer; }
     .tire-card:hover { border-color: var(--border); transform: translateY(-2px); }
-    .tire-card-images { display: flex; gap: 2px; height: 180px; overflow: hidden; background: var(--bg-tertiary); }
+    .tire-card-images { display: flex; gap: 2px; height: 180px; overflow: hidden; background: var(--bg-tertiary); position: relative; }
     .tire-card-images img { flex: 1; object-fit: cover; min-width: 0; transition: opacity 0.2s; }
     .tire-card-images img:hover { opacity: 0.85; }
     .tire-card-images .no-img { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); font-size: 12px; }
+    .sku-overlay {
+      position: absolute; top: 8px; left: 8px;
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);
+      color: var(--accent); font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500; padding: 3px 8px;
+      border-radius: 5px; letter-spacing: 0.3px; z-index: 2;
+    }
+    .sku-tag {
+      flex-shrink: 0;
+      background: var(--accent-dim); color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500; padding: 2px 8px;
+      border-radius: 5px; border: 1px solid var(--accent-mid);
+      letter-spacing: 0.3px; white-space: nowrap;
+    }
+    .row-thumb {
+      width: 40px; height: 40px; border-radius: 6px; object-fit: cover;
+      border: 1px solid var(--border-subtle);
+    }
+    .row-thumb-empty {
+      width: 40px; height: 40px; border-radius: 6px;
+      background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-tertiary); font-size: 11px;
+    }
+    .tire-row:hover .sku-tag { background: var(--accent-mid); }
     .tire-card-body { padding: 16px; }
     .tire-card-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.2px; }
     .tire-card-subtitle { font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; }
@@ -223,6 +249,7 @@
       apiUrl: "",
       connected: false,
       products: [],
+      _flatRows: [],
       filters: { search: "", brand: "", season: "", condition: "", size: "" },
     };
 
@@ -408,18 +435,20 @@
           return isNaN(d) ? s : { sum: s.sum + d, n: s.n + 1 };
         }, { sum: 0, n: 0 });
 
+        const totalSkus = state.products.reduce((s, p) => s + (p.variants?.length || 1), 0);
+
         el.innerHTML = `
           <div class="stats-grid fade-in">
-            ${statCard("Total Tires", count, true)}
+            ${statCard("Products", count, false)}
+            ${statCard("Total SKUs", totalSkus, true)}
             ${statCard("Brands", brands.length)}
             ${statCard("Avg. Tread", avgTread.n ? (avgTread.sum / avgTread.n).toFixed(1) + "mm" : "—")}
-            ${statCard("Active", state.products.filter(p => p.status === "active").length)}
           </div>
 
           <div class="filters-bar fade-in">
             <div class="filter-group">
               <label>Search</label>
-              <input class="filter-input" placeholder="Title, size..." oninput="state.filters.search=this.value;renderTireGrid()" />
+              <input class="filter-input" placeholder="Title, SKU, size..." oninput="state.filters.search=this.value;renderTireGrid()" />
             </div>
             <div class="filter-group">
               <label>Brand</label>
@@ -467,67 +496,79 @@
       if (!container) return;
 
       const f = state.filters;
-      const filtered = state.products.filter(p => {
+
+      // Flatten: one row per variant (SKU)
+      const rows = [];
+      state.products.forEach((p, pIdx) => {
         const m = p._meta;
-        if (f.search) {
-          const q = f.search.toLowerCase();
-          const searchable = `${p.title} ${m.brand} ${m.size} ${m.season} ${m.width}`.toLowerCase();
-          if (!searchable.includes(q)) return false;
-        }
-        if (f.brand && m.brand !== f.brand) return false;
-        if (f.season && m.season !== f.season) return false;
-        if (f.condition && m.condition !== f.condition) return false;
-        if (f.size && m.size !== f.size) return false;
-        return true;
+        const variants = p.variants && p.variants.length > 0 ? p.variants : [{}];
+        variants.forEach(v => {
+          const sku = v.sku || "—";
+          if (f.search) {
+            const q = f.search.toLowerCase();
+            const searchable = `${p.title} ${m.brand} ${m.size} ${m.season} ${m.width} ${sku}`.toLowerCase();
+            if (!searchable.includes(q)) return;
+          }
+          if (f.brand && m.brand !== f.brand) return;
+          if (f.season && m.season !== f.season) return;
+          if (f.condition && m.condition !== f.condition) return;
+          if (f.size && m.size !== f.size) return;
+          rows.push({ product: p, variant: v, meta: m, pIdx });
+        });
       });
 
-      if (filtered.length === 0) {
+      if (rows.length === 0) {
         container.innerHTML = `<div class="empty-state"><p>No tires match your filters</p></div>`;
         return;
       }
 
       container.innerHTML = `
-        <div style="margin-bottom:12px;font-size:12px;color:var(--text-tertiary)">${filtered.length} tire${filtered.length !== 1 ? 's' : ''} found</div>
-        <div class="tire-grid">
-          ${filtered.map((p, i) => tireCard(p, i)).join("")}
+        <div style="margin-bottom:12px;font-size:12px;color:var(--text-tertiary)">${rows.length} SKU${rows.length !== 1 ? 's' : ''} found</div>
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th style="width:52px"></th>
+              <th>SKU</th>
+              <th>Title</th>
+              <th>Brand</th>
+              <th>Size</th>
+              <th>Season</th>
+              <th>Condition</th>
+              <th>Tread</th>
+              <th>DOT</th>
+              <th>Price</th>
+              <th>Qty</th>
+            </tr></thead>
+            <tbody>
+              ${rows.map((r, i) => {
+                const img = (r.product.images || [])[0];
+                const sku = r.variant.sku || "—";
+                const price = r.variant.price || r.meta.price_per_tire;
+                return `<tr class="tire-row" onclick="openModal(${i})" style="cursor:pointer">
+                  <td style="padding:6px 10px 6px 14px">
+                    ${img ? `<img src="${img.src}" class="row-thumb" alt="" />` : `<div class="row-thumb-empty">—</div>`}
+                  </td>
+                  <td><span class="sku-tag">${sku}</span></td>
+                  <td style="color:var(--text-primary);font-weight:500">${r.product.title}</td>
+                  <td>${r.meta.brand || "—"}</td>
+                  <td class="mono">${r.meta.size || "—"}</td>
+                  <td>${seasonBadge(r.meta.season)}</td>
+                  <td>${conditionBadge(r.meta.condition)}</td>
+                  <td>${treadDepthBar(r.meta.tread_depth)}</td>
+                  <td class="mono">${r.meta.dot_date || "—"}</td>
+                  <td class="mono">${price ? money(price) : "—"}</td>
+                  <td class="mono">${r.meta.quantity || r.variant.inventory_quantity || "—"}</td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
         </div>`;
+
+      // Store flattened rows for modal
+      state._flatRows = rows;
     }
 
-    function tireCard(p, idx) {
-      const m = p._meta;
-      const images = (p.images || []).slice(0, 3);
-      const imgHtml = images.length > 0
-        ? images.map(img => `<img src="${img.src}" alt="${p.title}" loading="lazy" />`).join("")
-        : `<div class="no-img">No images</div>`;
-
-      const price = p.variants?.[0]?.price || m.price_per_tire;
-
-      return `
-        <div class="tire-card" onclick="openModal(${idx})">
-          <div class="tire-card-images">${imgHtml}</div>
-          <div class="tire-card-body">
-            <div class="tire-card-title">${p.title}</div>
-            <div class="tire-card-subtitle">${m.size || ""} ${m.brand ? "· " + m.brand : ""} ${price ? "· " + money(price) : ""}</div>
-            <div class="tire-card-meta">
-              <div class="tire-meta-item">
-                <span class="tire-meta-label">Season</span>
-                ${seasonBadge(m.season)}
-              </div>
-              <div class="tire-meta-item">
-                <span class="tire-meta-label">Condition</span>
-                <span class="tire-meta-value">${conditionBadge(m.condition)}</span>
-              </div>
-              <div class="tire-meta-item">
-                <span class="tire-meta-label">Tread</span>
-                <span class="tire-meta-value">${treadDepthBar(m.tread_depth)}</span>
-              </div>
-              <div class="tire-meta-item">
-                <span class="tire-meta-label">DOT</span>
-                <span class="tire-meta-value mono">${m.dot_date || "—"}</span>
-              </div>
-            </div>
-          </div>
-        </div>`;
+    function tireCard() { /* replaced by table rows */ }
     }
 
     function resetFilters() {
@@ -539,25 +580,34 @@
 
     // ── Detail Modal ────────────────────────────────────────────────
     function openModal(idx) {
-      const filtered = getFilteredProducts();
-      const p = filtered[idx];
-      if (!p) return;
-      const m = p._meta;
+      const row = state._flatRows?.[idx];
+      if (!row) return;
+      const p = row.product;
+      const m = row.meta;
+      const v = row.variant;
       const images = (p.images || []).slice(0, 3);
       const imgHtml = images.length > 0
         ? images.map(img => `<img src="${img.src}" alt="${p.title}" />`).join("")
         : `<div class="no-img" style="height:260px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary)">No images</div>`;
 
-      const price = p.variants?.[0]?.price || m.price_per_tire;
+      const price = v.price || m.price_per_tire;
+      const sku = v.sku || "—";
 
       const modal = document.getElementById("modal-content");
       modal.innerHTML = `
         <div class="modal-close" onclick="closeModal()">✕</div>
         <div class="modal-images">${imgHtml}</div>
         <div class="modal-body">
-          <div class="modal-title">${p.title}</div>
-          <div class="modal-subtitle">${m.size || ""} ${m.brand ? "· " + m.brand : ""} ${price ? "· " + money(price) : ""}</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+            <div class="modal-title">${p.title}</div>
+            <span class="sku-tag" style="font-size:12px;padding:3px 10px">${sku}</span>
+          </div>
+          <div class="modal-subtitle">SKU: ${sku} · ${m.size || ""} ${m.brand ? "· " + m.brand : ""} ${price ? "· " + money(price) : ""}</div>
           <div class="modal-meta-grid">
+            <div class="modal-meta-item">
+              <span class="tire-meta-label">SKU</span>
+              <span class="tire-meta-value mono" style="font-size:14px;color:var(--accent)">${sku}</span>
+            </div>
             ${TIRE_FIELDS.map(f => `
               <div class="modal-meta-item">
                 <span class="tire-meta-label">${f.label}</span>
@@ -566,6 +616,7 @@
                     f.key === 'condition' ? conditionBadge(m[f.key]) :
                     f.key === 'tread_depth' ? treadDepthBar(m[f.key]) :
                     f.key === 'price_per_tire' ? (m[f.key] ? money(m[f.key]) : price ? money(price) : "—") :
+                    f.key === 'quantity' ? (m[f.key] || v.inventory_quantity || "—") :
                     m[f.key] || "—"}
                 </span>
               </div>
@@ -575,19 +626,6 @@
         </div>`;
 
       document.getElementById("modal-overlay").classList.add("open");
-    }
-
-    function getFilteredProducts() {
-      const f = state.filters;
-      return state.products.filter(p => {
-        const m = p._meta;
-        if (f.search) { const q = f.search.toLowerCase(); if (!`${p.title} ${m.brand} ${m.size} ${m.season} ${m.width}`.toLowerCase().includes(q)) return false; }
-        if (f.brand && m.brand !== f.brand) return false;
-        if (f.season && m.season !== f.season) return false;
-        if (f.condition && m.condition !== f.condition) return false;
-        if (f.size && m.size !== f.size) return false;
-        return true;
-      });
     }
 
     function closeModal() {
@@ -606,9 +644,12 @@
         el.innerHTML = `
           <div class="stats-grid fade-in">${statCard("Total Orders", count, true)}${statCard("Paid", paid)}${statCard("Revenue", money(revenue))}${statCard("Avg. Order", orders.length ? money(revenue / orders.length) : "—")}</div>
           <div class="table-container fade-in"><div class="table-header"><h3>Recent Orders</h3></div>
-          <table><thead><tr><th>Order</th><th>Customer</th><th>Fulfillment</th><th>Payment</th><th>Total</th><th>Date</th></tr></thead>
-          <tbody>${orders.length === 0 ? '<tr><td colspan="6" class="loading-cell">No orders</td></tr>' :
-            orders.map(o => `<tr><td class="mono">${o.name}</td><td>${o.customer ? (o.customer.first_name||"")+" "+(o.customer.last_name||"") : o.email||"—"}</td><td>${statusBadge(o.fulfillment_status||"unfulfilled")}</td><td>${statusBadge(o.financial_status)}</td><td class="mono">${money(o.total_price)}</td><td>${new Date(o.created_at).toLocaleDateString()}</td></tr>`).join("")}
+          <table><thead><tr><th>Order</th><th>SKUs</th><th>Customer</th><th>Fulfillment</th><th>Payment</th><th>Total</th><th>Date</th></tr></thead>
+          <tbody>${orders.length === 0 ? '<tr><td colspan="7" class="loading-cell">No orders</td></tr>' :
+            orders.map(o => {
+              const skus = (o.line_items || []).map(li => li.sku).filter(Boolean).join(", ") || "—";
+              return `<tr><td class="mono">${o.name}</td><td class="mono" style="color:var(--accent)">${skus}</td><td>${o.customer ? (o.customer.first_name||"")+" "+(o.customer.last_name||"") : o.email||"—"}</td><td>${statusBadge(o.fulfillment_status||"unfulfilled")}</td><td>${statusBadge(o.financial_status)}</td><td class="mono">${money(o.total_price)}</td><td>${new Date(o.created_at).toLocaleDateString()}</td></tr>`;
+            }).join("")}
           </tbody></table></div>`;
       } catch (e) { el.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
     }

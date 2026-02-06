@@ -124,6 +124,14 @@
     .pic-count.low { background: #f59e0b14; color: var(--warning); }
     .pic-count.none { background: #ef444414; color: var(--danger); }
 
+    /* Studio pic counts */
+    .studio-count {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+      background: #3b82f614; color: var(--info);
+    }
+    .studio-count.empty { background: var(--bg-tertiary); color: var(--text-tertiary); }
+
     /* Channel indicators */
     .channel-indicators { display: flex; gap: 4px; align-items: center; }
     .ch-dot {
@@ -290,6 +298,7 @@
       connected: false,
       products: [],
       _flatRows: [],
+      studioCounts: {},
       filters: { search: "", brand: "", season: "", condition: "", size: "", webStatus: "" },
     };
 
@@ -457,11 +466,13 @@
         <div style="text-align:center;padding:60px;color:var(--text-tertiary)"><span class="pulse">Loading all products with metafields — this may take a moment...</span></div>`;
 
       try {
-        const [pRes, cRes] = await Promise.all([
+        const [pRes, cRes, studioRes] = await Promise.all([
           apiFetch("/api/products/with-metafields"),
           apiFetch("/api/products/count"),
+          apiFetch("/api/studio/sku-counts").catch(() => ({ sku_counts: {} })),
         ]);
         state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));
+        state.studioCounts = studioRes.sku_counts || {};
         const count = cRes.count ?? 0;
 
         // Extract unique values for filters
@@ -484,12 +495,17 @@
           return totalQty <= 0;
         }).length;
 
+        // Studio stats
+        const studioSkus = Object.keys(state.studioCounts).length;
+        const studioTotal = Object.values(state.studioCounts).reduce((s, c) => s + c.total, 0);
+
         el.innerHTML = `
-          <div class="stats-grid fade-in">
+          <div class="stats-grid fade-in" style="grid-template-columns:repeat(5,1fr)">
             ${statCard("Total SKUs", totalSkus, true)}
             ${statCard("🟢 Active", active)}
             ${statCard("📝 Draft", drafts)}
             ${statCard("🔴 Out of Stock", oos)}
+            ${statCard("📷 Studio Pics", studioTotal + " (" + studioSkus + " SKUs)")}
           </div>
 
           <div class="filters-bar fade-in">
@@ -604,7 +620,8 @@
               <th style="width:52px"></th>
               <th>SKU</th>
               <th>Title</th>
-              <th>Pics</th>
+              <th>📷 Shop</th>
+              <th>📷 Studio</th>
               <th>Channels</th>
               <th>Brand</th>
               <th>Size</th>
@@ -623,6 +640,10 @@
                 const price = r.variant.price || r.meta.price_per_tire;
                 const qty = parseInt(r.meta.quantity || r.variant.inventory_quantity || 0);
                 const webStatus = getWebStatus(r.product, qty);
+                const studio = sku !== "—" ? (state.studioCounts[sku] || null) : null;
+                const studioTotal = studio ? studio.total : 0;
+                const studioCompleted = studio ? studio.completed : 0;
+                const studioPending = studio ? (studio.pending + studio.processing + studio.draft) : 0;
                 const isOnEbay = false; // future
                 const isOnAmazon = false; // future
                 const isOnMarketplace = false; // future
@@ -632,7 +653,10 @@
                   </td>
                   <td><span class="sku-tag">${sku}</span></td>
                   <td style="color:var(--text-primary);font-weight:500">${r.product.title}</td>
-                  <td><span class="pic-count ${imgCount >= 3 ? 'good' : imgCount > 0 ? 'low' : 'none'}">${imgCount} 📷</span></td>
+                  <td><span class="pic-count ${imgCount >= 3 ? 'good' : imgCount > 0 ? 'low' : 'none'}">${imgCount}</span></td>
+                  <td>${studioTotal > 0
+                    ? `<span class="studio-count" title="${studioCompleted} done, ${studioPending} pending">${studioCompleted}✅${studioPending > 0 ? ` ${studioPending}⏳` : ''}</span>`
+                    : '<span class="studio-count empty">0</span>'}</td>
                   <td>
                     <div class="channel-indicators">
                       <span class="web-status-badge ${webStatus.cls}" title="${webStatus.title}">🌐 ${webStatus.label}</span>
@@ -685,6 +709,10 @@
       const imgCount = (p.images || []).length;
       const qty = parseInt(m.quantity || v.inventory_quantity || 0);
       const webStatus = getWebStatus(p, qty);
+      const studio = sku !== "—" ? (state.studioCounts[sku] || null) : null;
+      const studioTotal = studio ? studio.total : 0;
+      const studioCompleted = studio ? studio.completed : 0;
+      const studioPending = studio ? (studio.pending + studio.processing + studio.draft) : 0;
 
       const modal = document.getElementById("modal-content");
       modal.innerHTML = `
@@ -697,10 +725,17 @@
           </div>
           <div class="modal-subtitle">SKU: ${sku} · ${m.size || ""} ${m.brand ? "· " + m.brand : ""} ${price ? "· " + money(price) : ""}</div>
 
-          <div style="display:flex;gap:16px;margin:16px 0;padding:14px 16px;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border-subtle)">
+          <div style="display:flex;gap:16px;margin:16px 0;padding:14px 16px;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border-subtle);flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-tertiary);font-weight:500">Photos</span>
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-tertiary);font-weight:500">On Shopify</span>
               <span class="pic-count ${imgCount >= 3 ? 'good' : imgCount > 0 ? 'low' : 'none'}" style="font-size:13px;padding:3px 10px">${imgCount} 📷</span>
+            </div>
+            <div style="width:1px;background:var(--border-subtle)"></div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-tertiary);font-weight:500">In Studio</span>
+              ${studioTotal > 0
+                ? `<span class="studio-count" style="font-size:13px;padding:3px 10px">${studioCompleted}✅ done${studioPending > 0 ? `, ${studioPending}⏳ pending` : ''}</span>`
+                : `<span class="studio-count empty" style="font-size:13px;padding:3px 10px">No images</span>`}
             </div>
             <div style="width:1px;background:var(--border-subtle)"></div>
             <div style="display:flex;align-items:center;gap:8px">

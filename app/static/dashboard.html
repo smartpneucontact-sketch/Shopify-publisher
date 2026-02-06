@@ -132,6 +132,13 @@
     }
     .studio-count.empty { background: var(--bg-tertiary); color: var(--text-tertiary); }
 
+    /* Category tag */
+    .category-tag {
+      font-size: 11.5px; padding: 2px 8px; border-radius: 5px;
+      background: #a78bfa14; color: var(--allseason);
+      border: 1px solid #a78bfa30; white-space: nowrap;
+    }
+
     /* Channel indicators */
     .channel-indicators { display: flex; gap: 4px; align-items: center; }
     .ch-dot {
@@ -299,7 +306,7 @@
       products: [],
       _flatRows: [],
       studioCounts: {},
-      filters: { search: "", brand: "", season: "", condition: "", size: "", webStatus: "" },
+      filters: { search: "", brand: "", season: "", condition: "", size: "", webStatus: "", category: "" },
     };
 
     // Known metafield keys to look for (Shopify stores them with namespace.key)
@@ -480,6 +487,7 @@
         const seasons = [...new Set(state.products.map(p => p._meta.season).filter(Boolean))].sort();
         const conditions = [...new Set(state.products.map(p => p._meta.condition).filter(Boolean))].sort();
         const sizes = [...new Set(state.products.map(p => p._meta.size).filter(Boolean))].sort();
+        const categories = [...new Set(state.products.map(p => p.product_type).filter(Boolean))].sort();
 
         const avgTread = state.products.reduce((s, p) => {
           const d = parseFloat(p._meta.tread_depth);
@@ -511,7 +519,7 @@
           <div class="filters-bar fade-in">
             <div class="filter-group">
               <label>Search</label>
-              <input class="filter-input" placeholder="Title, SKU, size..." oninput="state.filters.search=this.value;renderTireGrid()" />
+              <input class="filter-input" placeholder="Title, SKU, category..." oninput="state.filters.search=this.value;renderTireGrid()" />
             </div>
             <div class="filter-group">
               <label>Status</label>
@@ -522,6 +530,13 @@
                 <option value="oos">🔴 Out of Stock</option>
                 <option value="hidden">🟡 Hidden</option>
                 <option value="archived">⚫ Archived</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Category</label>
+              <select class="filter-select" onchange="state.filters.category=this.value;renderTireGrid()">
+                <option value="">All Categories</option>
+                ${categories.map(c => `<option value="${c}">${c}</option>`).join("")}
               </select>
             </div>
             <div class="filter-group">
@@ -591,13 +606,14 @@
           const sku = v.sku || "—";
           if (f.search) {
             const q = f.search.toLowerCase();
-            const searchable = `${p.title} ${m.brand} ${m.size} ${m.season} ${m.width} ${sku}`.toLowerCase();
+            const searchable = `${p.title} ${m.brand} ${m.size} ${m.season} ${m.width} ${sku} ${p.product_type || ""}`.toLowerCase();
             if (!searchable.includes(q)) return;
           }
           if (f.brand && m.brand !== f.brand) return;
           if (f.season && m.season !== f.season) return;
           if (f.condition && m.condition !== f.condition) return;
           if (f.size && m.size !== f.size) return;
+          if (f.category && p.product_type !== f.category) return;
           if (f.webStatus) {
             const ws = getWebStatus(p, parseInt(m.quantity || v.inventory_quantity || 0));
             const wsKey = ws.cls.replace("ws-", "");
@@ -620,6 +636,7 @@
               <th style="width:52px"></th>
               <th>SKU</th>
               <th>Title</th>
+              <th>Category</th>
               <th>📷 Shop</th>
               <th>📷 Studio</th>
               <th>Channels</th>
@@ -653,6 +670,7 @@
                   </td>
                   <td><span class="sku-tag">${sku}</span></td>
                   <td style="color:var(--text-primary);font-weight:500">${r.product.title}</td>
+                  <td><span class="category-tag">${r.product.product_type || "—"}</span></td>
                   <td><span class="pic-count ${imgCount >= 3 ? 'good' : imgCount > 0 ? 'low' : 'none'}">${imgCount}</span></td>
                   <td>${studioTotal > 0
                     ? `<span class="studio-count" title="${studioCompleted} done, ${studioPending} pending">${studioCompleted}✅${studioPending > 0 ? ` ${studioPending}⏳` : ''}</span>`
@@ -686,7 +704,7 @@
     function tireCard() { /* replaced by table rows */ }
 
     function resetFilters() {
-      state.filters = { search: "", brand: "", season: "", condition: "", size: "", webStatus: "" };
+      state.filters = { search: "", brand: "", season: "", condition: "", size: "", webStatus: "", category: "" };
       document.querySelectorAll(".filter-select").forEach(s => s.value = "");
       document.querySelectorAll(".filter-input").forEach(i => i.value = "");
       renderTireGrid();
@@ -723,7 +741,7 @@
             <div class="modal-title">${p.title}</div>
             <span class="sku-tag" style="font-size:12px;padding:3px 10px">${sku}</span>
           </div>
-          <div class="modal-subtitle">SKU: ${sku} · ${m.size || ""} ${m.brand ? "· " + m.brand : ""} ${price ? "· " + money(price) : ""}</div>
+          <div class="modal-subtitle">SKU: ${sku} · ${m.size || ""} ${m.brand ? "· " + m.brand : ""} ${price ? "· " + money(price) : ""} ${p.product_type ? "· " + p.product_type : ""}</div>
 
           <div style="display:flex;gap:16px;margin:16px 0;padding:14px 16px;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border-subtle);flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:8px">
@@ -753,6 +771,10 @@
             <div class="modal-meta-item">
               <span class="tire-meta-label">SKU</span>
               <span class="tire-meta-value mono" style="font-size:14px;color:var(--accent)">${sku}</span>
+            </div>
+            <div class="modal-meta-item">
+              <span class="tire-meta-label">Category</span>
+              <span class="tire-meta-value"><span class="category-tag">${p.product_type || "—"}</span></span>
             </div>
             ${TIRE_FIELDS.map(f => `
               <div class="modal-meta-item">

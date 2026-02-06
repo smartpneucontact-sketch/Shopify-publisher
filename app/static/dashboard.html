@@ -139,6 +139,21 @@
       background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
       filter: grayscale(1); opacity: 0.35;
     }
+
+    /* Web status badges */
+    .web-status-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 8px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px; font-weight: 600; letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+    .ws-active { background: #22c55e18; color: var(--success); border: 1px solid #22c55e30; }
+    .ws-draft { background: #8b8b9418; color: var(--text-tertiary); border: 1px solid var(--border); }
+    .ws-oos { background: #ef444418; color: var(--danger); border: 1px solid #ef444430; }
+    .ws-archived { background: #8b8b9410; color: var(--text-tertiary); border: 1px solid var(--border-subtle); opacity: 0.6; }
+    .ws-hidden { background: #f59e0b18; color: var(--warning); border: 1px solid #f59e0b30; }
+    .ws-unknown { background: var(--bg-tertiary); color: var(--text-tertiary); border: 1px solid var(--border-subtle); }
     .tire-card-body { padding: 16px; }
     .tire-card-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.2px; }
     .tire-card-subtitle { font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; }
@@ -275,7 +290,7 @@
       connected: false,
       products: [],
       _flatRows: [],
-      filters: { search: "", brand: "", season: "", condition: "", size: "" },
+      filters: { search: "", brand: "", season: "", condition: "", size: "", webStatus: "" },
     };
 
     // Known metafield keys to look for (Shopify stores them with namespace.key)
@@ -461,20 +476,37 @@
         }, { sum: 0, n: 0 });
 
         const totalSkus = state.products.reduce((s, p) => s + (p.variants?.length || 1), 0);
-        const onWebsite = state.products.filter(p => p.published_at && p.status === "active").length;
+        const active = state.products.filter(p => p.status === "active" && p.published_at).length;
+        const drafts = state.products.filter(p => p.status === "draft").length;
+        const oos = state.products.filter(p => {
+          if (p.status !== "active" || !p.published_at) return false;
+          const totalQty = (p.variants || []).reduce((s, v) => s + (parseInt(v.inventory_quantity) || 0), 0);
+          return totalQty <= 0;
+        }).length;
 
         el.innerHTML = `
           <div class="stats-grid fade-in">
             ${statCard("Total SKUs", totalSkus, true)}
-            ${statCard("🌐 On Website", onWebsite + " / " + state.products.length)}
-            ${statCard("Brands", brands.length)}
-            ${statCard("Avg. Tread", avgTread.n ? (avgTread.sum / avgTread.n).toFixed(1) + "mm" : "—")}
+            ${statCard("🟢 Active", active)}
+            ${statCard("📝 Draft", drafts)}
+            ${statCard("🔴 Out of Stock", oos)}
           </div>
 
           <div class="filters-bar fade-in">
             <div class="filter-group">
               <label>Search</label>
               <input class="filter-input" placeholder="Title, SKU, size..." oninput="state.filters.search=this.value;renderTireGrid()" />
+            </div>
+            <div class="filter-group">
+              <label>Status</label>
+              <select class="filter-select" onchange="state.filters.webStatus=this.value;renderTireGrid()">
+                <option value="">All Status</option>
+                <option value="active">🟢 Active</option>
+                <option value="draft">📝 Draft</option>
+                <option value="oos">🔴 Out of Stock</option>
+                <option value="hidden">🟡 Hidden</option>
+                <option value="archived">⚫ Archived</option>
+              </select>
             </div>
             <div class="filter-group">
               <label>Brand</label>
@@ -517,6 +549,17 @@
       }
     }
 
+    function getWebStatus(product, qty) {
+      const status = product.status;
+      const published = !!product.published_at;
+      if (status === "draft") return { cls: "ws-draft", label: "Draft", title: "Draft — not visible on website" };
+      if (status === "archived") return { cls: "ws-archived", label: "Archived", title: "Archived — removed from website" };
+      if (status === "active" && published && qty <= 0) return { cls: "ws-oos", label: "OOS", title: "Active but Out of Stock" };
+      if (status === "active" && published) return { cls: "ws-active", label: "Active", title: "Live on website" };
+      if (status === "active" && !published) return { cls: "ws-hidden", label: "Hidden", title: "Active but not published to website" };
+      return { cls: "ws-unknown", label: "?", title: "Unknown status" };
+    }
+
     function renderTireGrid() {
       const container = document.getElementById("tire-grid-container");
       if (!container) return;
@@ -539,6 +582,11 @@
           if (f.season && m.season !== f.season) return;
           if (f.condition && m.condition !== f.condition) return;
           if (f.size && m.size !== f.size) return;
+          if (f.webStatus) {
+            const ws = getWebStatus(p, parseInt(m.quantity || v.inventory_quantity || 0));
+            const wsKey = ws.cls.replace("ws-", "");
+            if (wsKey !== f.webStatus) return;
+          }
           rows.push({ product: p, variant: v, meta: m, pIdx });
         });
       });
@@ -573,7 +621,8 @@
                 const imgCount = (r.product.images || []).length;
                 const sku = r.variant.sku || "—";
                 const price = r.variant.price || r.meta.price_per_tire;
-                const isOnWebsite = !!r.product.published_at && r.product.status === "active";
+                const qty = parseInt(r.meta.quantity || r.variant.inventory_quantity || 0);
+                const webStatus = getWebStatus(r.product, qty);
                 const isOnEbay = false; // future
                 const isOnAmazon = false; // future
                 const isOnMarketplace = false; // future
@@ -586,7 +635,7 @@
                   <td><span class="pic-count ${imgCount >= 3 ? 'good' : imgCount > 0 ? 'low' : 'none'}">${imgCount} 📷</span></td>
                   <td>
                     <div class="channel-indicators">
-                      <span class="ch-dot ${isOnWebsite ? 'on' : 'off'}" title="Website">🌐</span>
+                      <span class="web-status-badge ${webStatus.cls}" title="${webStatus.title}">🌐 ${webStatus.label}</span>
                       <span class="ch-dot ${isOnEbay ? 'on' : 'off'}" title="eBay">🏷️</span>
                       <span class="ch-dot ${isOnAmazon ? 'on' : 'off'}" title="Amazon">📦</span>
                       <span class="ch-dot ${isOnMarketplace ? 'on' : 'off'}" title="Marketplace">🏪</span>
@@ -613,7 +662,7 @@
     function tireCard() { /* replaced by table rows */ }
 
     function resetFilters() {
-      state.filters = { search: "", brand: "", season: "", condition: "", size: "" };
+      state.filters = { search: "", brand: "", season: "", condition: "", size: "", webStatus: "" };
       document.querySelectorAll(".filter-select").forEach(s => s.value = "");
       document.querySelectorAll(".filter-input").forEach(i => i.value = "");
       renderTireGrid();
@@ -634,7 +683,8 @@
       const price = v.price || m.price_per_tire;
       const sku = v.sku || "—";
       const imgCount = (p.images || []).length;
-      const isOnWebsite = !!p.published_at && p.status === "active";
+      const qty = parseInt(m.quantity || v.inventory_quantity || 0);
+      const webStatus = getWebStatus(p, qty);
 
       const modal = document.getElementById("modal-content");
       modal.innerHTML = `
@@ -656,7 +706,7 @@
             <div style="display:flex;align-items:center;gap:8px">
               <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-tertiary);font-weight:500">Channels</span>
               <div class="channel-indicators" style="gap:6px">
-                <span class="ch-dot ${isOnWebsite ? 'on' : 'off'}" title="Website" style="width:30px;height:30px;font-size:15px">🌐</span>
+                <span class="web-status-badge ${webStatus.cls}" style="font-size:12px;padding:4px 10px" title="${webStatus.title}">🌐 ${webStatus.label}</span>
                 <span class="ch-dot off" title="eBay" style="width:30px;height:30px;font-size:15px">🏷️</span>
                 <span class="ch-dot off" title="Amazon" style="width:30px;height:30px;font-size:15px">📦</span>
                 <span class="ch-dot off" title="Marketplace" style="width:30px;height:30px;font-size:15px">🏪</span>

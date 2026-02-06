@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app.config import settings
-from app.routes import products, orders, customers, inventory, health, studio
+from app.routes import products, orders, customers, inventory, health, studio, ebay
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -52,6 +52,7 @@ app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 app.include_router(customers.router, prefix="/api/customers", tags=["Customers"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
+app.include_router(ebay.router, prefix="/api/ebay", tags=["eBay"])
 
 
 @app.get("/")

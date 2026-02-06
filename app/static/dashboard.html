@@ -99,26 +99,26 @@
       flex-shrink: 0;
       background: var(--accent-dim); color: var(--accent);
       font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; font-weight: 500; padding: 2px 8px;
-      border-radius: 5px; border: 1px solid var(--accent-mid);
-      letter-spacing: 0.3px; white-space: nowrap;
+      font-size: 10px; font-weight: 500; padding: 2px 6px;
+      border-radius: 4px; border: 1px solid var(--accent-mid);
+      letter-spacing: 0.2px; white-space: nowrap;
     }
     .row-thumb {
-      width: 40px; height: 40px; border-radius: 6px; object-fit: cover;
+      width: 34px; height: 34px; border-radius: 4px; object-fit: cover;
       border: 1px solid var(--border-subtle);
     }
     .row-thumb-empty {
-      width: 40px; height: 40px; border-radius: 6px;
+      width: 34px; height: 34px; border-radius: 4px;
       background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
       display: flex; align-items: center; justify-content: center;
-      color: var(--text-tertiary); font-size: 11px;
+      color: var(--text-tertiary); font-size: 10px;
     }
     .tire-row:hover .sku-tag { background: var(--accent-mid); }
 
     /* Pic count */
     .pic-count {
-      font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
-      padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      padding: 1px 5px; border-radius: 4px; white-space: nowrap;
     }
     .pic-count.good { background: #22c55e14; color: var(--success); }
     .pic-count.low { background: #f59e0b14; color: var(--warning); }
@@ -126,24 +126,24 @@
 
     /* Studio pic counts */
     .studio-count {
-      font-family: 'JetBrains Mono', monospace; font-size: 11px;
-      padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      padding: 1px 5px; border-radius: 4px; white-space: nowrap;
       background: #3b82f614; color: var(--info);
     }
     .studio-count.empty { background: var(--bg-tertiary); color: var(--text-tertiary); }
 
     /* Category tag */
     .category-tag {
-      font-size: 11.5px; padding: 2px 8px; border-radius: 5px;
+      font-size: 10px; padding: 1px 6px; border-radius: 4px;
       background: #a78bfa14; color: var(--allseason);
       border: 1px solid #a78bfa30; white-space: nowrap;
     }
 
     /* Channel indicators */
-    .channel-indicators { display: flex; gap: 4px; align-items: center; }
+    .channel-indicators { display: flex; gap: 2px; align-items: center; }
     .ch-dot {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 26px; height: 26px; border-radius: 6px; font-size: 13px;
+      width: 20px; height: 20px; border-radius: 4px; font-size: 10px;
       transition: all 0.15s;
     }
     .ch-dot.on {
@@ -157,10 +157,10 @@
 
     /* Web status badges */
     .web-status-badge {
-      display: inline-flex; align-items: center; gap: 3px;
-      padding: 3px 8px; border-radius: 6px;
+      display: inline-flex; align-items: center; gap: 2px;
+      padding: 2px 5px; border-radius: 4px;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 10.5px; font-weight: 600; letter-spacing: 0.3px;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.2px;
       white-space: nowrap;
     }
     .ws-active { background: #22c55e18; color: var(--success); border: 1px solid #22c55e30; }
@@ -185,8 +185,8 @@
     .season-badge.all-season, .season-badge.allseason, .season-badge.all_season { background: #a78bfa20; color: var(--allseason); }
 
     /* Tread depth bar */
-    .tread-bar { display: flex; align-items: center; gap: 8px; }
-    .tread-bar-track { flex: 1; height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; max-width: 80px; }
+    .tread-bar { display: flex; align-items: center; gap: 4px; }
+    .tread-bar-track { flex: 1; height: 4px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden; max-width: 40px; }
     .tread-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
     .tread-bar-fill.good { background: var(--success); }
     .tread-bar-fill.fair { background: var(--warning); }
@@ -223,14 +223,14 @@
     .search-box input { background: transparent; border: none; outline: none; color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 12.5px; width: 180px; }
     .search-box input::placeholder { color: var(--text-tertiary); }
     .search-box svg { color: var(--text-tertiary); flex-shrink: 0; }
-    table { width: 100%; border-collapse: collapse; }
-    thead th { text-align: left; padding: 10px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-tertiary); font-weight: 500; border-bottom: 1px solid var(--border-subtle); background: var(--bg-tertiary); }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    thead th { text-align: left; padding: 8px 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-tertiary); font-weight: 500; border-bottom: 1px solid var(--border-subtle); background: var(--bg-tertiary); white-space: nowrap; overflow: hidden; }
     tbody tr { border-bottom: 1px solid var(--border-subtle); transition: background 0.1s; }
     tbody tr:hover { background: var(--bg-tertiary); }
     tbody tr:last-child { border-bottom: none; }
-    tbody td { padding: 12px 20px; font-size: 13px; color: var(--text-secondary); }
+    tbody td { padding: 14px 6px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     tbody td:first-child { color: var(--text-primary); font-weight: 500; }
-    .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
     .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 500; }
     .status-badge.active, .status-badge.open, .status-badge.fulfilled, .status-badge.paid { background: #22c55e18; color: var(--success); }
     .status-badge.draft, .status-badge.closed, .status-badge.unfulfilled { background: #8b8b9418; color: var(--text-tertiary); }
@@ -248,6 +248,28 @@
     .field input:focus { border-color: var(--accent); }
     .field input::placeholder { color: var(--text-tertiary); }
     .field .hint { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+
+    /* eBay page */
+    .ebay-layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
+    .ebay-sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .ebay-card { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 18px; }
+    .ebay-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+    .ebay-card .field select { width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; color: var(--text-primary); font-size: 12px; outline: none; }
+    .ebay-card .field input { width: 100%; }
+    .ebay-status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; }
+    .ebay-status.ok { background: #22c55e18; color: var(--success); }
+    .ebay-status.warn { background: #fb923c18; color: var(--warning); }
+    .ebay-status.off { background: #ef444418; color: var(--danger); }
+    .ebay-select-table { width: 100%; }
+    .ebay-select-table th, .ebay-select-table td { padding: 10px 8px; }
+    .ebay-select-table input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+    .ebay-log { max-height: 300px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .ebay-log-entry { padding: 6px 10px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; }
+    .ebay-log-entry.success { color: var(--success); }
+    .ebay-log-entry.error { color: var(--danger); }
+    .ebay-publish-bar { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 10px; margin-bottom: 12px; }
+    .ebay-count { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); font-weight: 600; }
+    @media (max-width: 900px) { .ebay-layout { grid-template-columns: 1fr; } }
     .connection-status { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 8px; font-size: 12.5px; font-weight: 500; margin-top: 16px; }
     .connection-status.connected { background: #22c55e14; color: var(--success); border: 1px solid #22c55e30; }
     .connection-status.disconnected { background: #ef444414; color: var(--danger); border: 1px solid #ef444430; }
@@ -307,6 +329,7 @@
       _flatRows: [],
       studioCounts: {},
       filters: { search: "", provider: "", model: "", webStatus: "", category: "" },
+      ebay: { status: null, policies: null, selectedSkus: new Set(), publishLog: [] },
     };
 
     // Actual metafield keys (namespace.key format from Shopify)
@@ -327,6 +350,7 @@
 
     const PAGES = [
       { id: "tires", label: "Tires", icon: "tire" },
+      { id: "ebay", label: "eBay", icon: "ebay" },
       { id: "orders", label: "Orders", icon: "shopping-bag" },
       { id: "customers", label: "Customers", icon: "users" },
       { id: "inventory", label: "Inventory", icon: "box" },
@@ -343,6 +367,7 @@
       "search": `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
       "check": `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
       "alert": `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+      "ebay": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 8l3 3-3 3"/><line x1="13" y1="13" x2="17" y2="13"/></svg>`,
     };
 
     // ── API ─────────────────────────────────────────────────────────
@@ -350,6 +375,16 @@
       const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
       const res = await fetch(base + endpoint);
       if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }
+
+    async function apiPost(endpoint, body) {
+      const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
+      const res = await fetch(base + endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       return res.json();
     }
 
@@ -444,7 +479,7 @@
       else if (pct < 60) cls = "fair";
       return `<div class="tread-bar">
         <div class="tread-bar-track"><div class="tread-bar-fill ${cls}" style="width:${pct}%"></div></div>
-        <span class="mono" style="font-size:11px">${num}mm</span>
+        <span class="mono" style="font-size:9px">${num}mm</span>
       </div>`;
     }
 
@@ -498,6 +533,7 @@
       }
       switch (state.page) {
         case "tires": return renderTires(el);
+        case "ebay": return renderEbay(el);
         case "orders": return renderOrders(el);
         case "customers": return renderCustomers(el);
         case "inventory": return renderInventory(el);
@@ -658,24 +694,24 @@
         <div class="table-container" style="overflow-x:auto">
           <table>
             <thead><tr>
-              <th style="width:52px"></th>
-              <th>SKU</th>
-              <th>Title</th>
-              <th>Category</th>
-              <th>📷 Shop</th>
-              <th>📷 Studio</th>
-              <th>Channels</th>
-              <th>Provider</th>
-              <th>Model</th>
-              <th>Size</th>
-              <th>Tread</th>
-              <th>DOT</th>
-              <th>Speed</th>
-              <th>Load</th>
-              <th>Price</th>
-              <th>Δ New</th>
-              <th>Qty</th>
-              <th>Arrival</th>
+              <th style="width:42px"></th>
+              <th style="width:80px">SKU</th>
+              <th style="width:auto">Title</th>
+              <th style="width:80px">Category</th>
+              <th style="width:36px">📷</th>
+              <th style="width:60px">Studio</th>
+              <th style="width:120px">Channels</th>
+              <th style="width:70px">Provider</th>
+              <th style="width:60px">Model</th>
+              <th style="width:70px">Size</th>
+              <th style="width:50px">Tread</th>
+              <th style="width:45px">DOT</th>
+              <th style="width:35px">Spd</th>
+              <th style="width:35px">Ld</th>
+              <th style="width:55px">Price</th>
+              <th style="width:50px">Δ New</th>
+              <th style="width:30px">Qty</th>
+              <th style="width:65px">Arrival</th>
             </tr></thead>
             <tbody>
               ${rows.map((r, i) => {
@@ -693,7 +729,7 @@
                 const isOnAmazon = false; // future
                 const isOnMarketplace = false; // future
                 return `<tr class="tire-row" onclick="openModal(${i})" style="cursor:pointer">
-                  <td style="padding:6px 10px 6px 14px">
+                  <td style="padding:10px 4px 10px 8px">
                     ${img ? `<img src="${img.src}" class="row-thumb" alt="" />` : `<div class="row-thumb-empty">—</div>`}
                   </td>
                   <td><span class="sku-tag">${sku}</span></td>
@@ -833,6 +869,278 @@
       document.getElementById("modal-overlay").classList.remove("open");
     }
     document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+    // ── EBAY PAGE ─────────────────────────────────────────────────
+    async function renderEbay(el) {
+      el.innerHTML = `<div class="empty-state"><span class="pulse">Loading eBay module...</span></div>`;
+
+      // Fetch eBay status
+      let ebayStatus = { configured: false, authenticated: false };
+      try { ebayStatus = await apiFetch("/api/ebay/status"); } catch {}
+
+      // Fetch policies if authenticated
+      let policies = { fulfillment: [], payment: [], return: [] };
+      if (ebayStatus.authenticated) {
+        try { policies = await apiFetch("/api/ebay/policies"); } catch {}
+      }
+      state.ebay.policies = policies;
+
+      // Get Shopify products if not loaded
+      if (!state.products.length) {
+        try {
+          const pRes = await apiFetch("/api/products/with-metafields");
+          state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));
+        } catch {}
+      }
+
+      // Build flat rows
+      const rows = [];
+      state.products.forEach(p => {
+        const m = p._meta;
+        (p.variants || [{}]).forEach(v => {
+          const sku = v.sku || "";
+          if (!sku) return;
+          rows.push({ product: p, variant: v, meta: m, sku });
+        });
+      });
+
+      const ffOpts = policies.fulfillment.map(p => `<option value="${p.fulfillmentPolicyId}">${p.name}</option>`).join("");
+      const ppOpts = policies.payment.map(p => `<option value="${p.paymentPolicyId}">${p.name}</option>`).join("");
+      const rrOpts = policies.return.map(p => `<option value="${p.returnPolicyId}">${p.name}</option>`).join("");
+
+      el.innerHTML = `
+        <div class="ebay-layout fade-in">
+          <div class="ebay-sidebar">
+            <!-- Connection -->
+            <div class="ebay-card">
+              <h3>🔗 Connection</h3>
+              ${!ebayStatus.configured ? `
+                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
+                  Set env vars on Railway:<br>
+                  <code style="font-size:10px;color:var(--accent)">EBAY_CLIENT_ID, EBAY_CLIENT_SECRET, EBAY_REDIRECT_URI</code>
+                </p>
+                <span class="ebay-status off">⚠ Not Configured</span>
+              ` : !ebayStatus.authenticated ? `
+                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
+                  Click below to authorize with eBay France
+                </p>
+                <span class="ebay-status warn">⏳ Not Authenticated</span>
+                <button class="btn btn-accent" style="margin-top:12px;width:100%" onclick="ebayConnect()">Connect eBay Account</button>
+                <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px">
+                  <div class="field">
+                    <label>Or paste refresh token</label>
+                    <input id="ebay-refresh-token" placeholder="v^1.1#i^1#p^3#..." style="font-size:10px" />
+                  </div>
+                  <button class="btn" style="width:100%;margin-top:6px" onclick="ebaySetToken()">Save Token</button>
+                </div>
+              ` : `
+                <span class="ebay-status ok">✓ Connected to eBay France</span>
+              `}
+            </div>
+
+            ${ebayStatus.authenticated ? `
+            <!-- Listing Settings -->
+            <div class="ebay-card">
+              <h3>⚙️ Listing Settings</h3>
+              <div class="field">
+                <label>eBay Category ID</label>
+                <input id="ebay-category" value="179680" placeholder="e.g. 179680 (Pneus)" />
+                <div class="hint">179680 = Pneus auto · <a href="https://www.isoldwhat.com" target="_blank" style="color:var(--accent)">Find ID</a></div>
+              </div>
+              <div class="field">
+                <label>Fulfillment Policy</label>
+                <select id="ebay-fulfillment">${ffOpts || '<option value="">— No policies found —</option>'}</select>
+              </div>
+              <div class="field">
+                <label>Payment Policy</label>
+                <select id="ebay-payment">${ppOpts || '<option value="">— No policies found —</option>'}</select>
+              </div>
+              <div class="field">
+                <label>Return Policy</label>
+                <select id="ebay-return">${rrOpts || '<option value="">— No policies found —</option>'}</select>
+              </div>
+              <div class="field">
+                <label>Price Adjustment (€)</label>
+                <input id="ebay-price-adj" type="number" value="0" step="0.5" />
+                <div class="hint">Added to Shopify price (use negative to discount)</div>
+              </div>
+            </div>
+
+            <!-- Publish Log -->
+            <div class="ebay-card">
+              <h3>📋 Publish Log</h3>
+              <div id="ebay-log" class="ebay-log">
+                ${state.ebay.publishLog.length ? state.ebay.publishLog.map(l => `
+                  <div class="ebay-log-entry ${l.ok ? 'success' : 'error'}">
+                    <span>${l.sku}</span>
+                    <span>${l.ok ? '✓ ' + (l.listingId || 'OK') : '✗ ' + l.error}</span>
+                  </div>
+                `).join("") : '<div style="color:var(--text-tertiary);padding:10px;text-align:center;font-size:11px">No publish activity yet</div>'}
+              </div>
+            </div>
+            ` : ""}
+          </div>
+
+          <!-- Product Selection -->
+          <div>
+            ${ebayStatus.authenticated ? `
+            <div class="ebay-publish-bar">
+              <input type="checkbox" id="ebay-select-all" onchange="ebayToggleAll(this.checked)" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer" />
+              <span style="font-size:12px;color:var(--text-secondary)">Select All</span>
+              <span class="ebay-count" id="ebay-selected-count">0 selected</span>
+              <div style="flex:1"></div>
+              <button class="btn" onclick="ebayPublishSelected()" id="ebay-publish-btn" disabled>
+                🚀 Publish to eBay France
+              </button>
+            </div>
+
+            <div style="background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:10px;overflow:hidden">
+              <table class="ebay-select-table">
+                <thead><tr>
+                  <th style="width:30px"></th>
+                  <th style="width:42px"></th>
+                  <th>SKU</th>
+                  <th>Title</th>
+                  <th>Size</th>
+                  <th>Provider</th>
+                  <th>Price</th>
+                  <th>Qty</th>
+                  <th>Web</th>
+                </tr></thead>
+                <tbody>
+                  ${rows.map(r => {
+                    const price = r.variant.price || "—";
+                    const qty = r.meta.tire_count || r.variant.inventory_quantity || "—";
+                    const ws = getWebStatus(r.product, parseInt(qty) || 0);
+                    const img = (r.product.images || [])[0];
+                    const checked = state.ebay.selectedSkus.has(r.sku) ? "checked" : "";
+                    return `<tr>
+                      <td><input type="checkbox" class="ebay-sku-cb" data-sku="${r.sku}" ${checked} onchange="ebayToggleSku('${r.sku}', this.checked)" /></td>
+                      <td>${img ? `<img src="${img.src}" class="row-thumb" />` : `<div class="row-thumb-empty">—</div>`}</td>
+                      <td><span class="sku-tag">${r.sku}</span></td>
+                      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.product.title}</td>
+                      <td class="mono">${r.meta._size || "—"}</td>
+                      <td>${r.meta.tire_provider || "—"}</td>
+                      <td class="mono">${price !== "—" ? money(price) : "—"}</td>
+                      <td class="mono">${qty}</td>
+                      <td><span class="web-status-badge ${ws.cls}">${ws.icon} ${ws.label}</span></td>
+                    </tr>`;
+                  }).join("")}
+                </tbody>
+              </table>
+              ${rows.length === 0 ? '<div style="padding:40px;text-align:center;color:var(--text-tertiary)">No products with SKUs found</div>' : ''}
+            </div>
+            ` : `
+            <div class="empty-state" style="margin-top:60px">
+              <p style="font-size:14px">Connect your eBay account to start publishing</p>
+              <p style="font-size:12px;color:var(--text-tertiary);margin-top:8px">
+                1. Create an app at <a href="https://developer.ebay.com" target="_blank" style="color:var(--accent)">developer.ebay.com</a><br>
+                2. Set EBAY_CLIENT_ID, EBAY_CLIENT_SECRET, EBAY_REDIRECT_URI on Railway<br>
+                3. Click "Connect eBay Account" to authorize
+              </p>
+            </div>
+            `}
+          </div>
+        </div>`;
+
+      ebayUpdateCount();
+    }
+
+    // ── eBay helpers ─────────────────────────────────────────────
+    async function ebayConnect() {
+      try {
+        const data = await apiFetch("/api/ebay/auth/url");
+        window.open(data.url, "_blank");
+      } catch (e) {
+        alert("Error getting auth URL: " + e.message);
+      }
+    }
+
+    async function ebaySetToken() {
+      const token = document.getElementById("ebay-refresh-token")?.value?.trim();
+      if (!token) return alert("Paste a refresh token first");
+      try {
+        await apiPost("/api/ebay/auth/token", { refresh_token: token });
+        alert("Token saved! Reloading...");
+        renderEbay(document.getElementById("content"));
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+
+    function ebayToggleSku(sku, checked) {
+      if (checked) state.ebay.selectedSkus.add(sku);
+      else state.ebay.selectedSkus.delete(sku);
+      ebayUpdateCount();
+    }
+
+    function ebayToggleAll(checked) {
+      document.querySelectorAll(".ebay-sku-cb").forEach(cb => {
+        cb.checked = checked;
+        if (checked) state.ebay.selectedSkus.add(cb.dataset.sku);
+        else state.ebay.selectedSkus.delete(cb.dataset.sku);
+      });
+      ebayUpdateCount();
+    }
+
+    function ebayUpdateCount() {
+      const n = state.ebay.selectedSkus.size;
+      const el = document.getElementById("ebay-selected-count");
+      const btn = document.getElementById("ebay-publish-btn");
+      if (el) el.textContent = n + " selected";
+      if (btn) btn.disabled = n === 0;
+    }
+
+    async function ebayPublishSelected() {
+      const skus = [...state.ebay.selectedSkus];
+      if (!skus.length) return;
+
+      const categoryId = document.getElementById("ebay-category")?.value || "179680";
+      const ffId = document.getElementById("ebay-fulfillment")?.value;
+      const ppId = document.getElementById("ebay-payment")?.value;
+      const rrId = document.getElementById("ebay-return")?.value;
+      const priceAdj = parseFloat(document.getElementById("ebay-price-adj")?.value || "0");
+
+      if (!ffId || !ppId || !rrId) {
+        alert("Please select fulfillment, payment, and return policies first.\nCreate them in eBay Seller Hub → Business Policies.");
+        return;
+      }
+
+      if (!confirm(`Publish ${skus.length} tire(s) to eBay France?\n\nCategory: ${categoryId}\nPrice adjustment: €${priceAdj >= 0 ? "+" : ""}${priceAdj}`)) return;
+
+      const btn = document.getElementById("ebay-publish-btn");
+      btn.disabled = true;
+      btn.textContent = "⏳ Publishing...";
+
+      try {
+        const result = await apiPost("/api/ebay/publish/bulk", {
+          skus,
+          category_id: categoryId,
+          fulfillment_policy_id: ffId,
+          payment_policy_id: ppId,
+          return_policy_id: rrId,
+          price_adjustment: priceAdj,
+        });
+
+        // Update log
+        (result.results || []).forEach(r => {
+          state.ebay.publishLog.unshift({
+            sku: r.sku || "?",
+            ok: r.status === "published",
+            listingId: r.listing_id,
+            error: r.status !== "published" ? JSON.stringify(r.errors || r.step || "unknown").slice(0, 80) : null,
+          });
+        });
+
+        alert(`Published: ${result.published}/${result.total}\nFailed: ${result.failed}`);
+        state.ebay.selectedSkus.clear();
+        renderEbay(document.getElementById("content"));
+      } catch (e) {
+        alert("Publish error: " + e.message);
+        btn.disabled = false;
+        btn.textContent = "🚀 Publish to eBay France";
+      }
+    }
 
     // ── Orders / Customers / Inventory (unchanged) ──────────────────
     async function renderOrders(el) {

@@ -13,10 +13,18 @@ router = APIRouter()
 @router.get("/status")
 async def ebay_status():
     """Check eBay connection status."""
+    import os
     return {
         "configured": ebay_tokens.is_configured,
         "authenticated": ebay_tokens.is_authenticated,
         "has_access_token": bool(ebay_tokens.access_token),
+        "debug": {
+            "client_id_set": bool(os.getenv("EBAY_CLIENT_ID")),
+            "client_id_len": len(os.getenv("EBAY_CLIENT_ID", "")),
+            "secret_set": bool(os.getenv("EBAY_CLIENT_SECRET")),
+            "redirect_set": bool(os.getenv("EBAY_REDIRECT_URI")),
+            "env": os.getenv("EBAY_ENV", "not set"),
+        }
     }
 
 
@@ -62,6 +70,59 @@ async def ebay_policies():
         return await ebay_client.get_all_policies()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/policies/create-defaults")
+async def ebay_create_default_policies():
+    """Create default fulfillment, payment, and return policies for eBay France."""
+    results = {}
+
+    # Fulfillment policy — flat rate €10, 3 day handling
+    try:
+        results["fulfillment"] = await ebay_client.create_fulfillment_policy({
+            "name": "Expédition Standard FR",
+            "marketplaceId": "EBAY_FR",
+            "handlingTime": {"value": 3, "unit": "DAY"},
+            "shippingOptions": [{
+                "optionType": "DOMESTIC",
+                "costType": "FLAT_RATE",
+                "shippingServices": [{
+                    "sortOrder": 1,
+                    "shippingCarrierCode": "Colissimo",
+                    "shippingServiceCode": "FR_ColossimoColissimo",
+                    "shippingCost": {"value": "10.00", "currency": "EUR"},
+                    "freeShipping": False,
+                }]
+            }]
+        })
+    except Exception as e:
+        results["fulfillment"] = {"status": "error", "detail": str(e)}
+
+    # Payment policy
+    try:
+        results["payment"] = await ebay_client.create_payment_policy({
+            "name": "Paiement Standard",
+            "marketplaceId": "EBAY_FR",
+            "paymentMethods": [{"paymentMethodType": "PERSONAL_CHECK"}],
+            "immediatePay": False,
+        })
+    except Exception as e:
+        results["payment"] = {"status": "error", "detail": str(e)}
+
+    # Return policy — 30 day returns
+    try:
+        results["return"] = await ebay_client.create_return_policy({
+            "name": "Retours 30 jours",
+            "marketplaceId": "EBAY_FR",
+            "returnsAccepted": True,
+            "returnPeriod": {"value": 30, "unit": "DAY"},
+            "returnShippingCostPayer": "BUYER",
+            "refundMethod": "MONEY_BACK",
+        })
+    except Exception as e:
+        results["return"] = {"status": "error", "detail": str(e)}
+
+    return results
 
 
 # ── Inventory Locations ──────────────────────────────────────────

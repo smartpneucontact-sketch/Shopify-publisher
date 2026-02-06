@@ -949,16 +949,22 @@
               </div>
               <div class="field">
                 <label>Fulfillment Policy</label>
-                <select id="ebay-fulfillment">${ffOpts || '<option value="">— No policies found —</option>'}</select>
+                <select id="ebay-fulfillment">${ffOpts || '<option value="">— No policies —</option>'}</select>
               </div>
               <div class="field">
                 <label>Payment Policy</label>
-                <select id="ebay-payment">${ppOpts || '<option value="">— No policies found —</option>'}</select>
+                <select id="ebay-payment">${ppOpts || '<option value="">— No policies —</option>'}</select>
               </div>
               <div class="field">
                 <label>Return Policy</label>
-                <select id="ebay-return">${rrOpts || '<option value="">— No policies found —</option>'}</select>
+                <select id="ebay-return">${rrOpts || '<option value="">— No policies —</option>'}</select>
               </div>
+              ${(!ffOpts && !ppOpts && !rrOpts) ? `
+              <button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="ebayCreatePolicies()">
+                📋 Create Default Policies
+              </button>
+              <div class="hint" style="margin-top:6px">Creates shipping (€10 flat), payment, and 30-day return policies</div>
+              ` : ''}
               <div class="field">
                 <label>Price Adjustment (€)</label>
                 <input id="ebay-price-adj" type="number" value="0" step="0.5" />
@@ -1065,6 +1071,22 @@
         renderEbay(document.getElementById("content"));
       } catch (e) {
         alert("Error: " + e.message);
+      }
+    }
+
+    async function ebayCreatePolicies() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = "⏳ Creating...";
+      try {
+        const result = await apiPost("/api/ebay/policies/create-defaults", {});
+        const ok = ["fulfillment","payment","return"].filter(k => result[k] && !result[k].status?.includes("error")).length;
+        alert(`Created ${ok}/3 policies. Reloading...`);
+        renderEbay(document.getElementById("content"));
+      } catch (e) {
+        alert("Error: " + e.message);
+        btn.disabled = false;
+        btn.textContent = "📋 Create Default Policies";
       }
     }
 

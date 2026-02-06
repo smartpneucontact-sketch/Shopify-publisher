@@ -89,7 +89,8 @@ class EbayTokenManager:
 
     def get_auth_url(self) -> str:
         """Generate the eBay consent URL for the user to authorize."""
-        scope = " ".join(SCOPES)
+        from urllib.parse import quote
+        scope = quote(" ".join(SCOPES))
         return (
             f"{EBAY_AUTH_URL}"
             f"?client_id={EBAY_CLIENT_ID}"
@@ -254,6 +255,15 @@ class EbayInventoryClient:
             "payment": pp.get("paymentPolicies", []),
             "return": rr.get("returnPolicies", []),
         }
+
+    async def create_fulfillment_policy(self, data: dict) -> dict:
+        return await self._request("POST", f"{self.account_base}/fulfillment_policy", json_body=data)
+
+    async def create_payment_policy(self, data: dict) -> dict:
+        return await self._request("POST", f"{self.account_base}/payment_policy", json_body=data)
+
+    async def create_return_policy(self, data: dict) -> dict:
+        return await self._request("POST", f"{self.account_base}/return_policy", json_body=data)
 
     # ── Inventory Location ────────────────────────────────────────
     async def get_locations(self) -> dict:

@@ -195,23 +195,41 @@ class ShopifyAdminClient:
         # Fetch taxonomy categories via GraphQL in parallel
         categories_task = asyncio.create_task(self.get_product_categories())
 
-        BATCH_SIZE = 20
+        BATCH_SIZE = 10  # Smaller batches to avoid rate limits
+        failed_ids = []
 
         async with httpx.AsyncClient(timeout=120, headers=self.headers) as client:
-            async def enrich(product):
+            async def enrich(product, attempt=1):
                 try:
                     resp = await client.get(
                         f"{self.base_url}/products/{product['id']}/metafields.json"
                     )
+                    # Handle Shopify rate limiting (429)
+                    if resp.status_code == 429:
+                        retry_after = float(resp.headers.get("Retry-After", "2"))
+                        print(f"⏳ Rate limited on product {product['id']}, waiting {retry_after}s...")
+                        await asyncio.sleep(retry_after)
+                        if attempt < 3:
+                            return await enrich(product, attempt + 1)
                     resp.raise_for_status()
                     product["metafields"] = resp.json().get("metafields", [])
-                except Exception:
+                except Exception as e:
+                    failed_ids.append(product["id"])
+                    print(f"⚠️ Metafield fetch failed for product {product['id']} (attempt {attempt}): {e}")
+                    if attempt < 3:
+                        await asyncio.sleep(1)
+                        return await enrich(product, attempt + 1)
                     product["metafields"] = []
                 return product
 
             for i in range(0, len(products), BATCH_SIZE):
                 batch = products[i:i + BATCH_SIZE]
                 await asyncio.gather(*[enrich(p) for p in batch])
+                # Small pause between batches to stay under rate limit
+                await asyncio.sleep(0.5)
+
+        if failed_ids:
+            print(f"⚠️ Failed to fetch metafields for {len(failed_ids)} products: {failed_ids[:10]}...")
 
         # Merge taxonomy categories
         try:

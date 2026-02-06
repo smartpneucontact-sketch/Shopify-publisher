@@ -60,3 +60,22 @@ async def get_product_metafields(product_id: int):
         return await shopify_client.get_product_metafields(product_id)
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Metafields for product {product_id} not found")
+
+
+@router.get("/debug/metafields-sample")
+async def debug_metafields_sample():
+    """Return raw metafield data for the first 3 products (debug)."""
+    try:
+        products = await shopify_client.get_all_products()
+        sample = products[:3]
+        results = []
+        for p in sample:
+            mf = await shopify_client.get_product_metafields(p["id"])
+            results.append({
+                "id": p["id"],
+                "title": p["title"],
+                "metafields_raw": mf,
+            })
+        return {"sample": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

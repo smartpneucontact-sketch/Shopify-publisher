@@ -354,14 +354,35 @@
     }
 
     // ── Metafield helpers ───────────────────────────────────────────
+    function parseMetaValue(val) {
+      if (val === null || val === undefined) return null;
+      // Shopify can wrap values in JSON — try to unwrap
+      if (typeof val === "string") {
+        // Remove surrounding quotes if double-quoted JSON string: "\"hello\"" → hello
+        if (val.startsWith('"') && val.endsWith('"')) {
+          try { val = JSON.parse(val); } catch {}
+        }
+        // Try JSON parse for objects/arrays
+        if (val.startsWith('{') || val.startsWith('[')) {
+          try { return JSON.parse(val); } catch {}
+        }
+      }
+      return val;
+    }
+
     function getMeta(product, fieldKey) {
-      if (!product.metafields) return null;
-      // Exact match on key (metafields come as {namespace, key, value})
-      const mf = product.metafields.find(m =>
-        m.key === fieldKey ||
-        (m.namespace === "custom" && m.key === fieldKey)
+      if (!product.metafields || !product.metafields.length) return null;
+      // Try exact namespace.key match first
+      let mf = product.metafields.find(m => m.namespace === "custom" && m.key === fieldKey);
+      // Fallback: match just the key
+      if (!mf) mf = product.metafields.find(m => m.key === fieldKey);
+      // Fallback: fuzzy match (key contains fieldKey or fieldKey contains key)
+      if (!mf) mf = product.metafields.find(m =>
+        m.key.replace(/-/g, "_").includes(fieldKey.replace(/-/g, "_")) ||
+        fieldKey.replace(/-/g, "_").includes(m.key.replace(/-/g, "_"))
       );
-      return mf ? mf.value : null;
+      if (!mf) return null;
+      return parseMetaValue(mf.value);
     }
 
     function getMetaAll(product) {
@@ -374,6 +395,20 @@
       // Build a display size string from width/height/rim
       result._size = [result.largeur, result.hauteur, result.rayon].filter(Boolean).join("/");
       return result;
+    }
+
+    // Debug: log first product's metafields on load
+    function debugMetafields() {
+      if (!state.products.length) return;
+      const p = state.products[0];
+      console.group("🔍 Metafield Debug — " + p.title);
+      console.log("Raw metafields:", p.metafields);
+      console.log("Parsed meta:", p._meta);
+      console.log("Metafield count:", (p.metafields || []).length);
+      (p.metafields || []).forEach(m => {
+        console.log(`  ${m.namespace}.${m.key} = ${m.value} (type: ${m.type})`);
+      });
+      console.groupEnd();
     }
 
     // ── Rendering helpers ───────────────────────────────────────────
@@ -483,6 +518,9 @@
         ]);
         state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));
         state.studioCounts = studioRes.sku_counts || {};
+        debugMetafields();
+        const withMeta = state.products.filter(p => p.metafields && p.metafields.length > 0).length;
+        console.log(`📊 Metafield coverage: ${withMeta}/${state.products.length} products have metafields`);
         const count = cRes.count ?? 0;
 
         // Extract unique values for filters
@@ -507,14 +545,16 @@
         // Studio stats
         const studioSkus = Object.keys(state.studioCounts).length;
         const studioTotal = Object.values(state.studioCounts).reduce((s, c) => s + c.total, 0);
+        const withMeta2 = state.products.filter(p => p.metafields && p.metafields.length > 0).length;
 
         el.innerHTML = `
-          <div class="stats-grid fade-in" style="grid-template-columns:repeat(5,1fr)">
+          <div class="stats-grid fade-in" style="grid-template-columns:repeat(6,1fr)">
             ${statCard("Total SKUs", totalSkus, true)}
             ${statCard("🟢 Active", active)}
             ${statCard("📝 Draft", drafts)}
             ${statCard("🔴 Out of Stock", oos)}
             ${statCard("📷 Studio Pics", studioTotal + " (" + studioSkus + " SKUs)")}
+            ${statCard("🏷️ Metafields", withMeta2 + " / " + state.products.length)}
           </div>
 
           <div class="filters-bar fade-in">

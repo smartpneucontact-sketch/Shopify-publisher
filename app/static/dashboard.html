@@ -306,23 +306,23 @@
       products: [],
       _flatRows: [],
       studioCounts: {},
-      filters: { search: "", brand: "", season: "", condition: "", size: "", webStatus: "", category: "" },
+      filters: { search: "", provider: "", model: "", webStatus: "", category: "" },
     };
 
-    // Known metafield keys to look for (Shopify stores them with namespace.key)
+    // Actual metafield keys (namespace.key format from Shopify)
     const TIRE_FIELDS = [
-      { key: "brand", label: "Brand" },
-      { key: "size", label: "Size" },
-      { key: "width", label: "Width" },
-      { key: "rim_diameter", label: "Rim" },
-      { key: "season", label: "Season" },
+      { key: "tire_provider", label: "Provider" },
+      { key: "model", label: "Model" },
+      { key: "largeur", label: "Width" },
+      { key: "hauteur", label: "Height" },
+      { key: "rayon", label: "Rim ⌀" },
       { key: "tread_depth", label: "Tread Depth" },
-      { key: "condition", label: "Condition" },
-      { key: "dot_date", label: "DOT Date" },
+      { key: "dot", label: "DOT" },
+      { key: "speed_index", label: "Speed Index" },
       { key: "load_index", label: "Load Index" },
-      { key: "speed_rating", label: "Speed Rating" },
-      { key: "price_per_tire", label: "Price/Tire" },
-      { key: "quantity", label: "Qty" },
+      { key: "tire_count", label: "Qty" },
+      { key: "arrival_date", label: "Arrival Date" },
+      { key: "price_difference_to_new", label: "Δ Price to New" },
     ];
 
     const PAGES = [
@@ -356,9 +356,10 @@
     // ── Metafield helpers ───────────────────────────────────────────
     function getMeta(product, fieldKey) {
       if (!product.metafields) return null;
+      // Exact match on key (metafields come as {namespace, key, value})
       const mf = product.metafields.find(m =>
-        m.key === fieldKey || m.key.endsWith("_" + fieldKey) ||
-        m.key.replace(/-/g, "_").includes(fieldKey.replace(/-/g, "_"))
+        m.key === fieldKey ||
+        (m.namespace === "custom" && m.key === fieldKey)
       );
       return mf ? mf.value : null;
     }
@@ -368,8 +369,10 @@
       for (const f of TIRE_FIELDS) {
         result[f.key] = getMeta(product, f.key);
       }
-      // Also try from product title/vendor as fallback
-      if (!result.brand && product.vendor) result.brand = product.vendor;
+      // Fallbacks: vendor as provider
+      if (!result.tire_provider && product.vendor) result.tire_provider = product.vendor;
+      // Build a display size string from width/height/rim
+      result._size = [result.largeur, result.hauteur, result.rayon].filter(Boolean).join("/");
       return result;
     }
 
@@ -483,10 +486,8 @@
         const count = cRes.count ?? 0;
 
         // Extract unique values for filters
-        const brands = [...new Set(state.products.map(p => p._meta.brand).filter(Boolean))].sort();
-        const seasons = [...new Set(state.products.map(p => p._meta.season).filter(Boolean))].sort();
-        const conditions = [...new Set(state.products.map(p => p._meta.condition).filter(Boolean))].sort();
-        const sizes = [...new Set(state.products.map(p => p._meta.size).filter(Boolean))].sort();
+        const providers = [...new Set(state.products.map(p => p._meta.tire_provider).filter(Boolean))].sort();
+        const models = [...new Set(state.products.map(p => p._meta.model).filter(Boolean))].sort();
         const categories = [...new Set(state.products.map(p => p.taxonomy_category).filter(Boolean))].sort();
 
         const avgTread = state.products.reduce((s, p) => {
@@ -540,31 +541,17 @@
               </select>
             </div>
             <div class="filter-group">
-              <label>Brand</label>
-              <select class="filter-select" onchange="state.filters.brand=this.value;renderTireGrid()">
-                <option value="">All Brands</option>
-                ${brands.map(b => `<option value="${b}">${b}</option>`).join("")}
+              <label>Provider</label>
+              <select class="filter-select" onchange="state.filters.provider=this.value;renderTireGrid()">
+                <option value="">All Providers</option>
+                ${providers.map(b => `<option value="${b}">${b}</option>`).join("")}
               </select>
             </div>
             <div class="filter-group">
-              <label>Season</label>
-              <select class="filter-select" onchange="state.filters.season=this.value;renderTireGrid()">
-                <option value="">All Seasons</option>
-                ${seasons.map(s => `<option value="${s}">${s}</option>`).join("")}
-              </select>
-            </div>
-            <div class="filter-group">
-              <label>Condition</label>
-              <select class="filter-select" onchange="state.filters.condition=this.value;renderTireGrid()">
-                <option value="">All Conditions</option>
-                ${conditions.map(c => `<option value="${c}">${c}</option>`).join("")}
-              </select>
-            </div>
-            <div class="filter-group">
-              <label>Size</label>
-              <select class="filter-select" onchange="state.filters.size=this.value;renderTireGrid()">
-                <option value="">All Sizes</option>
-                ${sizes.map(s => `<option value="${s}">${s}</option>`).join("")}
+              <label>Model</label>
+              <select class="filter-select" onchange="state.filters.model=this.value;renderTireGrid()">
+                <option value="">All Models</option>
+                ${models.map(m => `<option value="${m}">${m}</option>`).join("")}
               </select>
             </div>
             <div class="filter-group">
@@ -606,16 +593,14 @@
           const sku = v.sku || "—";
           if (f.search) {
             const q = f.search.toLowerCase();
-            const searchable = `${p.title} ${m.brand} ${m.size} ${m.season} ${m.width} ${sku} ${p.taxonomy_category || ""}`.toLowerCase();
+            const searchable = `${p.title} ${m.tire_provider} ${m._size} ${m.model} ${m.largeur} ${sku} ${p.taxonomy_category || ""}`.toLowerCase();
             if (!searchable.includes(q)) return;
           }
-          if (f.brand && m.brand !== f.brand) return;
-          if (f.season && m.season !== f.season) return;
-          if (f.condition && m.condition !== f.condition) return;
-          if (f.size && m.size !== f.size) return;
+          if (f.provider && m.tire_provider !== f.provider) return;
+          if (f.model && m.model !== f.model) return;
           if (f.category && p.taxonomy_category !== f.category) return;
           if (f.webStatus) {
-            const ws = getWebStatus(p, parseInt(m.quantity || v.inventory_quantity || 0));
+            const ws = getWebStatus(p, parseInt(m.tire_count || v.inventory_quantity || 0));
             const wsKey = ws.cls.replace("ws-", "");
             if (wsKey !== f.webStatus) return;
           }
@@ -640,22 +625,25 @@
               <th>📷 Shop</th>
               <th>📷 Studio</th>
               <th>Channels</th>
-              <th>Brand</th>
+              <th>Provider</th>
+              <th>Model</th>
               <th>Size</th>
-              <th>Season</th>
-              <th>Condition</th>
               <th>Tread</th>
               <th>DOT</th>
+              <th>Speed</th>
+              <th>Load</th>
               <th>Price</th>
+              <th>Δ New</th>
               <th>Qty</th>
+              <th>Arrival</th>
             </tr></thead>
             <tbody>
               ${rows.map((r, i) => {
                 const img = (r.product.images || [])[0];
                 const imgCount = (r.product.images || []).length;
                 const sku = r.variant.sku || "—";
-                const price = r.variant.price || r.meta.price_per_tire;
-                const qty = parseInt(r.meta.quantity || r.variant.inventory_quantity || 0);
+                const price = r.variant.price;
+                const qty = parseInt(r.meta.tire_count || r.variant.inventory_quantity || 0);
                 const webStatus = getWebStatus(r.product, qty);
                 const studio = sku !== "—" ? (state.studioCounts[sku] || null) : null;
                 const studioTotal = studio ? studio.total : 0;
@@ -683,14 +671,17 @@
                       <span class="ch-dot ${isOnMarketplace ? 'on' : 'off'}" title="Marketplace">🏪</span>
                     </div>
                   </td>
-                  <td>${r.meta.brand || "—"}</td>
-                  <td class="mono">${r.meta.size || "—"}</td>
-                  <td>${seasonBadge(r.meta.season)}</td>
-                  <td>${conditionBadge(r.meta.condition)}</td>
+                  <td>${r.meta.tire_provider || "—"}</td>
+                  <td>${r.meta.model || "—"}</td>
+                  <td class="mono">${r.meta._size || "—"}</td>
                   <td>${treadDepthBar(r.meta.tread_depth)}</td>
-                  <td class="mono">${r.meta.dot_date || "—"}</td>
+                  <td class="mono">${r.meta.dot || "—"}</td>
+                  <td class="mono">${r.meta.speed_index || "—"}</td>
+                  <td class="mono">${r.meta.load_index || "—"}</td>
                   <td class="mono">${price ? money(price) : "—"}</td>
-                  <td class="mono">${r.meta.quantity || r.variant.inventory_quantity || "—"}</td>
+                  <td class="mono">${r.meta.price_difference_to_new ? money(r.meta.price_difference_to_new) : "—"}</td>
+                  <td class="mono">${r.meta.tire_count || r.variant.inventory_quantity || "—"}</td>
+                  <td class="mono">${r.meta.arrival_date || "—"}</td>
                 </tr>`;
               }).join("")}
             </tbody>
@@ -704,7 +695,7 @@
     function tireCard() { /* replaced by table rows */ }
 
     function resetFilters() {
-      state.filters = { search: "", brand: "", season: "", condition: "", size: "", webStatus: "", category: "" };
+      state.filters = { search: "", provider: "", model: "", webStatus: "", category: "" };
       document.querySelectorAll(".filter-select").forEach(s => s.value = "");
       document.querySelectorAll(".filter-input").forEach(i => i.value = "");
       renderTireGrid();
@@ -722,10 +713,10 @@
         ? images.map(img => `<img src="${img.src}" alt="${p.title}" />`).join("")
         : `<div class="no-img" style="height:260px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary)">No images</div>`;
 
-      const price = v.price || m.price_per_tire;
+      const price = v.price;
       const sku = v.sku || "—";
       const imgCount = (p.images || []).length;
-      const qty = parseInt(m.quantity || v.inventory_quantity || 0);
+      const qty = parseInt(m.tire_count || v.inventory_quantity || 0);
       const webStatus = getWebStatus(p, qty);
       const studio = sku !== "—" ? (state.studioCounts[sku] || null) : null;
       const studioTotal = studio ? studio.total : 0;
@@ -741,7 +732,7 @@
             <div class="modal-title">${p.title}</div>
             <span class="sku-tag" style="font-size:12px;padding:3px 10px">${sku}</span>
           </div>
-          <div class="modal-subtitle">SKU: ${sku} · ${m.size || ""} ${m.brand ? "· " + m.brand : ""} ${price ? "· " + money(price) : ""} ${p.taxonomy_category ? "· " + p.taxonomy_category : ""}</div>
+          <div class="modal-subtitle">SKU: ${sku} · ${m._size || ""} ${m.tire_provider ? "· " + m.tire_provider : ""} ${m.model ? "· " + m.model : ""} ${price ? "· " + money(price) : ""} ${p.taxonomy_category ? "· " + p.taxonomy_category : ""}</div>
 
           <div style="display:flex;gap:16px;margin:16px 0;padding:14px 16px;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border-subtle);flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:8px">
@@ -783,12 +774,10 @@
             ${TIRE_FIELDS.map(f => `
               <div class="modal-meta-item">
                 <span class="tire-meta-label">${f.label}</span>
-                <span class="tire-meta-value${['dot_date','load_index','speed_rating','width','rim_diameter','quantity'].includes(f.key) ? ' mono' : ''}">
-                  ${f.key === 'season' ? seasonBadge(m[f.key]) :
-                    f.key === 'condition' ? conditionBadge(m[f.key]) :
-                    f.key === 'tread_depth' ? treadDepthBar(m[f.key]) :
-                    f.key === 'price_per_tire' ? (m[f.key] ? money(m[f.key]) : price ? money(price) : "—") :
-                    f.key === 'quantity' ? (m[f.key] || v.inventory_quantity || "—") :
+                <span class="tire-meta-value${['dot','load_index','speed_index','largeur','hauteur','rayon','tire_count','arrival_date'].includes(f.key) ? ' mono' : ''}">
+                  ${f.key === 'tread_depth' ? treadDepthBar(m[f.key]) :
+                    f.key === 'price_difference_to_new' ? (m[f.key] ? money(m[f.key]) : "—") :
+                    f.key === 'tire_count' ? (m[f.key] || v.inventory_quantity || "—") :
                     m[f.key] || "—"}
                 </span>
               </div>

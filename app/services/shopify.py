@@ -188,68 +188,141 @@ class ShopifyAdminClient:
         return categories
 
     async def get_products_with_metafields(self) -> list:
-        """Fetch ALL products then batch-fetch all their metafields + taxonomy categories."""
-        import asyncio
-        products = await self.get_all_products()
+        """Fetch ALL products + metafields + categories via GraphQL in ~1-2 calls."""
+        all_products = []
+        cursor = None
 
-        # Fetch taxonomy categories via GraphQL in parallel
-        categories_task = asyncio.create_task(self.get_product_categories())
+        while True:
+            after = f', after: "{cursor}"' if cursor else ""
+            query = f"""
+            {{
+              products(first: 50{after}) {{
+                edges {{
+                  cursor
+                  node {{
+                    id
+                    title
+                    handle
+                    status
+                    publishedAt
+                    productType
+                    vendor
+                    bodyHtml
+                    createdAt
+                    updatedAt
+                    productCategory {{
+                      productTaxonomyNode {{
+                        fullName
+                        name
+                      }}
+                    }}
+                    images(first: 20) {{
+                      edges {{
+                        node {{
+                          id
+                          src
+                          altText
+                        }}
+                      }}
+                    }}
+                    variants(first: 50) {{
+                      edges {{
+                        node {{
+                          id
+                          title
+                          sku
+                          price
+                          inventoryQuantity
+                        }}
+                      }}
+                    }}
+                    metafields(first: 30) {{
+                      edges {{
+                        node {{
+                          namespace
+                          key
+                          value
+                          type
+                        }}
+                      }}
+                    }}
+                  }}
+                }}
+                pageInfo {{
+                  hasNextPage
+                }}
+              }}
+            }}
+            """
+            data = await self._graphql(query)
+            errors = data.get("errors")
+            if errors:
+                print(f"⚠️ GraphQL errors: {errors}")
 
-        BATCH_SIZE = 10  # Smaller batches to avoid rate limits
-        failed_ids = []
+            products = data.get("data", {}).get("products", {})
+            edges = products.get("edges", [])
 
-        async with httpx.AsyncClient(timeout=120, headers=self.headers) as client:
-            async def enrich(product, attempt=1):
-                try:
-                    resp = await client.get(
-                        f"{self.base_url}/products/{product['id']}/metafields.json"
-                    )
-                    # Handle Shopify rate limiting (429)
-                    if resp.status_code == 429:
-                        retry_after = float(resp.headers.get("Retry-After", "2"))
-                        print(f"⏳ Rate limited on product {product['id']}, waiting {retry_after}s...")
-                        await asyncio.sleep(retry_after)
-                        if attempt < 3:
-                            return await enrich(product, attempt + 1)
-                    resp.raise_for_status()
-                    product["metafields"] = resp.json().get("metafields", [])
-                except Exception as e:
-                    failed_ids.append(product["id"])
-                    print(f"⚠️ Metafield fetch failed for product {product['id']} (attempt {attempt}): {e}")
-                    if attempt < 3:
-                        await asyncio.sleep(1)
-                        return await enrich(product, attempt + 1)
-                    product["metafields"] = []
-                return product
+            for edge in edges:
+                node = edge["node"]
+                # Convert GraphQL format to REST-like format for dashboard compatibility
+                gid = node["id"]
+                numeric_id = int(gid.split("/")[-1]) if "/" in gid else gid
 
-            for i in range(0, len(products), BATCH_SIZE):
-                batch = products[i:i + BATCH_SIZE]
-                await asyncio.gather(*[enrich(p) for p in batch])
-                # Small pause between batches to stay under rate limit
-                await asyncio.sleep(0.5)
+                # Category
+                cat = node.get("productCategory")
+                tax_name = ""
+                tax_full = ""
+                if cat and cat.get("productTaxonomyNode"):
+                    tax_name = cat["productTaxonomyNode"].get("name", "")
+                    tax_full = cat["productTaxonomyNode"].get("fullName", "")
 
-        if failed_ids:
-            print(f"⚠️ Failed to fetch metafields for {len(failed_ids)} products: {failed_ids[:10]}...")
+                product = {
+                    "id": numeric_id,
+                    "title": node.get("title", ""),
+                    "handle": node.get("handle", ""),
+                    "status": node.get("status", "").lower(),
+                    "published_at": node.get("publishedAt"),
+                    "product_type": node.get("productType", ""),
+                    "vendor": node.get("vendor", ""),
+                    "body_html": node.get("bodyHtml", ""),
+                    "created_at": node.get("createdAt", ""),
+                    "updated_at": node.get("updatedAt", ""),
+                    "taxonomy_category": tax_name,
+                    "taxonomy_full": tax_full,
+                    "images": [
+                        {"id": img["node"]["id"], "src": img["node"]["src"], "alt": img["node"].get("altText")}
+                        for img in node.get("images", {}).get("edges", [])
+                    ],
+                    "variants": [
+                        {
+                            "id": v["node"]["id"],
+                            "title": v["node"].get("title", ""),
+                            "sku": v["node"].get("sku", ""),
+                            "price": v["node"].get("price", ""),
+                            "inventory_quantity": v["node"].get("inventoryQuantity", 0),
+                        }
+                        for v in node.get("variants", {}).get("edges", [])
+                    ],
+                    "metafields": [
+                        {
+                            "namespace": mf["node"]["namespace"],
+                            "key": mf["node"]["key"],
+                            "value": mf["node"]["value"],
+                            "type": mf["node"].get("type", ""),
+                        }
+                        for mf in node.get("metafields", {}).get("edges", [])
+                    ],
+                }
+                all_products.append(product)
+                cursor = edge.get("cursor")
 
-        # Merge taxonomy categories
-        try:
-            categories = await categories_task
-            for p in products:
-                gid = f"gid://shopify/Product/{p['id']}"
-                cat = categories.get(gid)
-                if cat:
-                    p["taxonomy_category"] = cat["name"]
-                    p["taxonomy_full"] = cat["fullName"]
-                else:
-                    p["taxonomy_category"] = ""
-                    p["taxonomy_full"] = ""
-        except Exception as e:
-            print(f"⚠️ Category fetch failed: {e}")
-            for p in products:
-                p["taxonomy_category"] = ""
-                p["taxonomy_full"] = ""
+            print(f"📦 Fetched {len(all_products)} products so far...")
 
-        return products
+            if not products.get("pageInfo", {}).get("hasNextPage", False):
+                break
+
+        print(f"✅ Done: {len(all_products)} products with metafields loaded via GraphQL")
+        return all_products
 
 
 # Singleton

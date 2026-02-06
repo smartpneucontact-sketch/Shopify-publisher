@@ -45,6 +45,13 @@ class Settings(BaseSettings):
         }
 
     @property
+    def shopify_graphql_url(self) -> str:
+        return (
+            f"https://{self.SHOPIFY_STORE_DOMAIN}/admin/api/"
+            f"{self.SHOPIFY_API_VERSION}/graphql.json"
+        )
+
+    @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
 

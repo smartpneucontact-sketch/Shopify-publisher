@@ -14,6 +14,7 @@ class ShopifyAdminClient:
     def __init__(self):
         self.base_url = settings.shopify_base_url
         self.headers = settings.shopify_headers
+        self.graphql_url = settings.shopify_graphql_url
 
     async def _request(
         self,
@@ -30,6 +31,20 @@ class ShopifyAdminClient:
                 headers=self.headers,
                 params=params,
                 json=json_body,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def _graphql(self, query: str, variables: Optional[dict] = None) -> dict:
+        """Execute a GraphQL query against the Shopify Admin API."""
+        body = {"query": query}
+        if variables:
+            body["variables"] = variables
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                self.graphql_url,
+                headers=self.headers,
+                json=body,
             )
             response.raise_for_status()
             return response.json()
@@ -126,10 +141,59 @@ class ShopifyAdminClient:
                     break
         return all_products
 
+    async def get_product_categories(self) -> dict:
+        """Fetch product ID → category name mapping via GraphQL.
+        Returns dict like { "gid://shopify/Product/123": "Automotive Tires" }
+        """
+        categories = {}
+        cursor = None
+        while True:
+            after = f', after: "{cursor}"' if cursor else ""
+            query = f"""
+            {{
+              products(first: 250{after}) {{
+                edges {{
+                  cursor
+                  node {{
+                    id
+                    productCategory {{
+                      productTaxonomyNode {{
+                        fullName
+                        name
+                      }}
+                    }}
+                  }}
+                }}
+                pageInfo {{
+                  hasNextPage
+                }}
+              }}
+            }}
+            """
+            data = await self._graphql(query)
+            products = data.get("data", {}).get("products", {})
+            edges = products.get("edges", [])
+            for edge in edges:
+                node = edge["node"]
+                cat = node.get("productCategory")
+                if cat and cat.get("productTaxonomyNode"):
+                    tax = cat["productTaxonomyNode"]
+                    categories[node["id"]] = {
+                        "name": tax.get("name", ""),
+                        "fullName": tax.get("fullName", ""),
+                    }
+                cursor = edge.get("cursor")
+            if not products.get("pageInfo", {}).get("hasNextPage", False):
+                break
+        return categories
+
     async def get_products_with_metafields(self) -> list:
-        """Fetch ALL products then batch-fetch all their metafields."""
+        """Fetch ALL products then batch-fetch all their metafields + taxonomy categories."""
         import asyncio
         products = await self.get_all_products()
+
+        # Fetch taxonomy categories via GraphQL in parallel
+        categories_task = asyncio.create_task(self.get_product_categories())
 
         BATCH_SIZE = 20
 
@@ -148,6 +212,24 @@ class ShopifyAdminClient:
             for i in range(0, len(products), BATCH_SIZE):
                 batch = products[i:i + BATCH_SIZE]
                 await asyncio.gather(*[enrich(p) for p in batch])
+
+        # Merge taxonomy categories
+        try:
+            categories = await categories_task
+            for p in products:
+                gid = f"gid://shopify/Product/{p['id']}"
+                cat = categories.get(gid)
+                if cat:
+                    p["taxonomy_category"] = cat["name"]
+                    p["taxonomy_full"] = cat["fullName"]
+                else:
+                    p["taxonomy_category"] = ""
+                    p["taxonomy_full"] = ""
+        except Exception as e:
+            print(f"⚠️ Category fetch failed: {e}")
+            for p in products:
+                p["taxonomy_category"] = ""
+                p["taxonomy_full"] = ""
 
         return products
 

@@ -381,7 +381,11 @@ class EbayInventoryClient:
                             existing_offer_id = param["value"]
                             break
             if existing_offer_id:
-                # Publish the existing offer directly
+                # Update the existing offer with current data, then publish
+                update_result = await self.update_offer(existing_offer_id, offer_data)
+                if update_result.get("status") == "error":
+                    return {"step": "update_existing_offer", "offer_id": existing_offer_id, **update_result}
+                # Now publish
                 pub_result = await self.publish_offer(existing_offer_id)
                 if pub_result.get("status") == "error":
                     return {"step": "publish_existing_offer", "offer_id": existing_offer_id, **pub_result}
@@ -392,7 +396,7 @@ class EbayInventoryClient:
                     "offer_id": existing_offer_id,
                     "listing_id": listing_id,
                     "ebay_url": f"https://www.ebay.fr/itm/{listing_id}" if listing_id else None,
-                    "note": "published existing offer",
+                    "note": "updated and published existing offer",
                 }
             return {"step": "create_offer", **offer_result}
 

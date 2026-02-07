@@ -314,7 +314,6 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
             if mf["namespace"] == "custom":
                 key = mf["key"]
                 label_map = {
-                    "tire_provider": "Marque",
                     "model": "Modèle",
                     "largeur": "Largeur du pneu",
                     "hauteur": "Rapport d'aspect",
@@ -326,6 +325,10 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
                 }
                 if key in label_map and mf.get("value"):
                     aspects[label_map[key]] = [str(mf["value"])]
+
+        # Brand comes from Shopify vendor field
+        if p.get("vendor"):
+            aspects["Marque"] = [p["vendor"]]
 
         # Get quantity from metafield or variant
         qty_mf = next((mf["value"] for mf in p.get("metafields", [])
@@ -389,7 +392,6 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
         if mf["namespace"] == "custom":
             key = mf["key"]
             label_map = {
-                "tire_provider": "Marque",
                 "model": "Modèle",
                 "largeur": "Largeur du pneu",
                 "hauteur": "Rapport d'aspect",
@@ -401,6 +403,10 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
             }
             if key in label_map and mf.get("value"):
                 aspects[label_map[key]] = [str(mf["value"])]
+
+    # Brand comes from Shopify vendor field
+    if p.get("vendor"):
+        aspects["Marque"] = [p["vendor"]]
 
     qty_mf = next((mf["value"] for mf in p.get("metafields", [])
                     if mf.get("key") == "tire_count"), None)

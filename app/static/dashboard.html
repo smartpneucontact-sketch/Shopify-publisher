@@ -979,7 +979,7 @@
                 ${state.ebay.publishLog.length ? state.ebay.publishLog.map(l => `
                   <div class="ebay-log-entry ${l.ok ? 'success' : 'error'}">
                     <span>${l.sku}</span>
-                    <span>${l.ok ? '✓ ' + (l.listingId || 'OK') : '✗ ' + l.error}</span>
+                    <span style="word-break:break-all;max-height:80px;overflow-y:auto;display:block;font-size:10px">${l.ok ? '✓ ' + (l.listingId || 'OK') : '✗ ' + (l.error || '').slice(0, 300)}</span>
                   </div>
                 `).join("") : '<div style="color:var(--text-tertiary);padding:10px;text-align:center;font-size:11px">No publish activity yet</div>'}
               </div>
@@ -1150,7 +1150,7 @@
             sku: r.sku || "?",
             ok: r.status === "published",
             listingId: r.listing_id,
-            error: r.status !== "published" ? JSON.stringify(r.errors || r.step || "unknown").slice(0, 80) : null,
+            error: r.status !== "published" ? JSON.stringify(r.errors || r.step || "unknown") : null,
           });
         });
 

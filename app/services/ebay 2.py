@@ -179,8 +179,8 @@ class EbayInventoryClient:
                 headers=headers,
                 json=json_body,
             )
-            if resp.status_code == 204 or (resp.status_code == 200 and not resp.text.strip()):
-                return {"status": "success", "code": resp.status_code}
+            if resp.status_code == 204:
+                return {"status": "success", "code": 204}
             if resp.status_code >= 400:
                 try:
                     err = resp.json()
@@ -370,30 +370,6 @@ class EbayInventoryClient:
 
         offer_result = await self.create_offer(offer_data)
         if offer_result.get("status") == "error":
-            # Handle "offer already exists" — extract offerId and publish it
-            errors = offer_result.get("errors", {})
-            err_list = errors.get("errors", []) if isinstance(errors, dict) else []
-            existing_offer_id = None
-            for err in err_list:
-                if err.get("errorId") == 25002:  # Offer already exists
-                    for param in err.get("parameters", []):
-                        if param.get("name") == "offerId":
-                            existing_offer_id = param["value"]
-                            break
-            if existing_offer_id:
-                # Publish the existing offer directly
-                pub_result = await self.publish_offer(existing_offer_id)
-                if pub_result.get("status") == "error":
-                    return {"step": "publish_existing_offer", "offer_id": existing_offer_id, **pub_result}
-                listing_id = pub_result.get("listingId")
-                return {
-                    "status": "published",
-                    "sku": sku,
-                    "offer_id": existing_offer_id,
-                    "listing_id": listing_id,
-                    "ebay_url": f"https://www.ebay.fr/itm/{listing_id}" if listing_id else None,
-                    "note": "published existing offer",
-                }
             return {"step": "create_offer", **offer_result}
 
         offer_id = offer_result.get("offerId")

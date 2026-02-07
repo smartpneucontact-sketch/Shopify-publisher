@@ -160,6 +160,7 @@ class EbayInventoryClient:
         self.tokens = token_manager
         self.base = f"{EBAY_API_BASE}/sell/inventory/v1"
         self.account_base = f"{EBAY_API_BASE}/sell/account/v1"
+        self.taxonomy_base = f"{EBAY_API_BASE}/commerce/taxonomy/v1"
 
     async def _headers(self) -> dict:
         token = await self.tokens.get_access_token()
@@ -291,6 +292,15 @@ class EbayInventoryClient:
             except Exception:
                 err = {"message": resp.text}
             return {"status": "error", "code": resp.status_code, "errors": err}
+
+    # ── Taxonomy / Category Aspects ──────────────────────────────
+    async def get_category_aspects(self, category_id: str) -> dict:
+        """Get required and recommended aspects for a category."""
+        # First get the default category tree ID for EBAY_FR
+        return await self._request(
+            "GET",
+            f"{self.taxonomy_base}/category_tree/71/get_item_aspects_for_category?category_id={category_id}"
+        )
 
     # ── High-Level: Publish a Shopify product to eBay ─────────────
     async def publish_product(

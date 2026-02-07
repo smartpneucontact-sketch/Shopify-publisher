@@ -205,6 +205,28 @@ async def ebay_create_gls_policy():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Category Aspects ──────────────────────────────────────────────
+@router.get("/category-aspects/{category_id}")
+async def ebay_category_aspects(category_id: str):
+    """Get required and recommended aspects for an eBay category."""
+    try:
+        result = await ebay_client.get_category_aspects(category_id)
+        # Extract just the required ones for easy reading
+        required = []
+        if "aspects" in result:
+            for aspect in result["aspects"]:
+                constraint = aspect.get("aspectConstraint", {})
+                if constraint.get("aspectRequired"):
+                    required.append({
+                        "name": aspect.get("localizedAspectName"),
+                        "mode": constraint.get("aspectMode"),
+                        "values": [v.get("localizedValue") for v in aspect.get("aspectValues", [])[:20]],
+                    })
+        return {"category_id": category_id, "required_aspects": required, "full_response": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Listing Status ───────────────────────────────────────────────
 @router.get("/offers")
 async def ebay_offers_for_sku(sku: str = Query(...)):
@@ -340,6 +362,14 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
         if "Type de pneu" not in aspects:
             aspects["Type de pneu"] = ["Été"]
 
+        # MPN — use SKU or "Non applicable"
+        if "Numéro de pièce fabricant" not in aspects:
+            aspects["Numéro de pièce fabricant"] = ["Non applicable"]
+
+        # Type de véhicule — default for passenger car tires
+        if "Type de véhicule" not in aspects:
+            aspects["Type de véhicule"] = ["Voiture"]
+
         # Get quantity from metafield or variant
         qty_mf = next((mf["value"] for mf in p.get("metafields", [])
                        if mf.get("key") == "tire_count"), None)
@@ -427,6 +457,14 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
     # Default Type de pneu to Été if not set
     if "Type de pneu" not in aspects:
         aspects["Type de pneu"] = ["Été"]
+
+    # MPN — default to "Non applicable"
+    if "Numéro de pièce fabricant" not in aspects:
+        aspects["Numéro de pièce fabricant"] = ["Non applicable"]
+
+    # Type de véhicule — default for passenger car tires
+    if "Type de véhicule" not in aspects:
+        aspects["Type de véhicule"] = ["Voiture"]
 
     qty_mf = next((mf["value"] for mf in p.get("metafields", [])
                     if mf.get("key") == "tire_count"), None)

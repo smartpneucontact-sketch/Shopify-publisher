@@ -322,6 +322,8 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
                     "dot": "DOT",
                     "speed_index": "Indice de vitesse",
                     "load_index": "Indice de charge",
+                    "tire_count": "Quantité",
+                    "season": "Type de pneu",
                 }
                 if key in label_map and mf.get("value"):
                     aspects[label_map[key]] = [str(mf["value"])]
@@ -329,6 +331,14 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
         # Brand comes from Shopify vendor field
         if p.get("vendor"):
             aspects["Marque"] = [p["vendor"]]
+
+        # Default Quantité to 1 if not set
+        if "Quantité" not in aspects:
+            aspects["Quantité"] = ["1"]
+
+        # Default Type de pneu to Été if not set
+        if "Type de pneu" not in aspects:
+            aspects["Type de pneu"] = ["Été"]
 
         # Get quantity from metafield or variant
         qty_mf = next((mf["value"] for mf in p.get("metafields", [])
@@ -400,6 +410,8 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
                 "dot": "DOT",
                 "speed_index": "Indice de vitesse",
                 "load_index": "Indice de charge",
+                "tire_count": "Quantité",
+                "season": "Type de pneu",
             }
             if key in label_map and mf.get("value"):
                 aspects[label_map[key]] = [str(mf["value"])]
@@ -407,6 +419,14 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
     # Brand comes from Shopify vendor field
     if p.get("vendor"):
         aspects["Marque"] = [p["vendor"]]
+
+    # Default Quantité to 1 if not set
+    if "Quantité" not in aspects:
+        aspects["Quantité"] = ["1"]
+
+    # Default Type de pneu to Été if not set
+    if "Type de pneu" not in aspects:
+        aspects["Type de pneu"] = ["Été"]
 
     qty_mf = next((mf["value"] for mf in p.get("metafields", [])
                     if mf.get("key") == "tire_count"), None)

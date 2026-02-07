@@ -344,7 +344,6 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
                     "dot": "Code de date DOT",
                     "speed_index": "Indice de vitesse",
                     "load_index": "Indice de charge",
-                    "tire_count": "Quantité",
                     "season": "Type de pneu",
                 }
                 if key in label_map and mf.get("value"):
@@ -358,9 +357,12 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
         if p.get("vendor"):
             aspects["Marque"] = [p["vendor"]]
 
-        # Default Quantité to 1 if not set
-        if "Quantité" not in aspects:
-            aspects["Quantité"] = ["1"]
+        # Quantité = tire_count / 2 (sold in pairs)
+        qty_mf = next((mf["value"] for mf in p.get("metafields", [])
+                       if mf.get("key") == "tire_count"), None)
+        tire_count = int(qty_mf) if qty_mf else 2
+        quantite = max(1, tire_count // 2)
+        aspects["Quantité"] = [str(quantite)]
 
         # Default Type de pneu to Été if not set
         if "Type de pneu" not in aspects:
@@ -370,10 +372,8 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
         if "Numéro de pièce fabricant" not in aspects:
             aspects["Numéro de pièce fabricant"] = ["Non applicable"]
 
-        # Get quantity from metafield or variant
-        qty_mf = next((mf["value"] for mf in p.get("metafields", [])
-                       if mf.get("key") == "tire_count"), None)
-        quantity = int(qty_mf) if qty_mf else int(v.get("inventory_quantity", 1))
+        # Inventory quantity = tire_count / 2
+        quantity = quantite
 
         result = await ebay_client.publish_product(
             sku=sku,
@@ -390,6 +390,22 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
             return_policy_id=req.return_policy_id,
             location_key=req.location_key,
         )
+
+        # Save eBay listing data to Shopify metafields on success
+        if result.get("status") == "published" and result.get("listing_id"):
+            try:
+                from datetime import datetime
+                product_id = p["id"]
+                await shopify_client.set_product_metafields_bulk(product_id, [
+                    {"key": "listing_id", "value": str(result["listing_id"])},
+                    {"key": "offer_id", "value": str(result["offer_id"])},
+                    {"key": "ebay_url", "value": result.get("ebay_url", "")},
+                    {"key": "published_at", "value": datetime.utcnow().isoformat()},
+                    {"key": "ebay_status", "value": "ACTIVE"},
+                ])
+            except Exception as e:
+                result["metafield_warning"] = f"Published but failed to save metafields: {e}"
+
         results.append(result)
 
     published = sum(1 for r in results if r.get("status") == "published")
@@ -440,7 +456,6 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
                 "dot": "Code de date DOT",
                 "speed_index": "Indice de vitesse",
                 "load_index": "Indice de charge",
-                "tire_count": "Quantité",
                 "season": "Type de pneu",
             }
             if key in label_map and mf.get("value"):
@@ -453,9 +468,12 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
     if p.get("vendor"):
         aspects["Marque"] = [p["vendor"]]
 
-    # Default Quantité to 1 if not set
-    if "Quantité" not in aspects:
-        aspects["Quantité"] = ["1"]
+    # Quantité = tire_count / 2 (sold in pairs)
+    qty_mf = next((mf["value"] for mf in p.get("metafields", [])
+                    if mf.get("key") == "tire_count"), None)
+    tire_count = int(qty_mf) if qty_mf else 2
+    quantite = max(1, tire_count // 2)
+    aspects["Quantité"] = [str(quantite)]
 
     # Default Type de pneu to Été if not set
     if "Type de pneu" not in aspects:
@@ -465,9 +483,7 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
     if "Numéro de pièce fabricant" not in aspects:
         aspects["Numéro de pièce fabricant"] = ["Non applicable"]
 
-    qty_mf = next((mf["value"] for mf in p.get("metafields", [])
-                    if mf.get("key") == "tire_count"), None)
-    quantity = int(qty_mf) if qty_mf else int(v.get("inventory_quantity", 1))
+    quantity = quantite
 
     item_data = {
         "availability": {
@@ -580,3 +596,152 @@ async def ebay_withdraw(offer_id: str):
         return await ebay_client.withdraw_offer(offer_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Listing Status & Analytics ──────────────────────────────────
+@router.get("/listings")
+async def ebay_listings():
+    """Get eBay listing status for all products that have eBay metafields."""
+    from app.services.shopify import shopify_client
+
+    products = await shopify_client.get_products_with_metafields()
+    listings = []
+
+    for p in products:
+        ebay_mf = {}
+        sku = None
+        for mf in p.get("metafields", []):
+            if mf["namespace"] == "ebay":
+                ebay_mf[mf["key"]] = mf["value"]
+            if mf["namespace"] == "custom" and mf["key"] == "tire_count":
+                ebay_mf["tire_count"] = mf["value"]
+        for v in p.get("variants", []):
+            if v.get("sku"):
+                sku = v["sku"]
+                break
+
+        if ebay_mf.get("listing_id"):
+            listings.append({
+                "product_id": p["id"],
+                "sku": sku,
+                "title": p.get("title", ""),
+                "listing_id": ebay_mf.get("listing_id"),
+                "offer_id": ebay_mf.get("offer_id"),
+                "ebay_url": ebay_mf.get("ebay_url"),
+                "ebay_status": ebay_mf.get("ebay_status", "UNKNOWN"),
+                "published_at": ebay_mf.get("published_at"),
+            })
+
+    return {"total": len(listings), "listings": listings}
+
+
+@router.get("/listings/analytics")
+async def ebay_listings_analytics():
+    """Fetch analytics (views, impressions) for all published listings."""
+    from app.services.shopify import shopify_client
+
+    products = await shopify_client.get_products_with_metafields()
+    listing_ids = []
+    listing_map = {}
+
+    for p in products:
+        for mf in p.get("metafields", []):
+            if mf["namespace"] == "ebay" and mf["key"] == "listing_id" and mf["value"]:
+                lid = mf["value"]
+                listing_ids.append(lid)
+                sku = next((v["sku"] for v in p.get("variants", []) if v.get("sku")), None)
+                listing_map[lid] = {"product_id": p["id"], "sku": sku, "title": p.get("title", "")}
+
+    if not listing_ids:
+        return {"total": 0, "listings": []}
+
+    # Try to get analytics from eBay
+    analytics = await ebay_client.get_listing_analytics(listing_ids)
+
+    # Also get offer details for each listing to confirm status
+    offer_details = {}
+    for p in products:
+        offer_id = None
+        for mf in p.get("metafields", []):
+            if mf["namespace"] == "ebay" and mf["key"] == "offer_id":
+                offer_id = mf["value"]
+        if offer_id:
+            try:
+                detail = await ebay_client.get_offer_details(offer_id)
+                if detail.get("status") != "error":
+                    lid = detail.get("listing", {}).get("listingId") or detail.get("listingId")
+                    offer_details[offer_id] = {
+                        "offer_status": detail.get("status"),
+                        "listing_status": detail.get("listing", {}).get("listingStatus"),
+                        "listing_id": lid,
+                    }
+            except Exception:
+                pass
+
+    result = []
+    for lid, info in listing_map.items():
+        entry = {**info, "listing_id": lid}
+        # Merge analytics if available
+        if isinstance(analytics, dict) and analytics.get("dimensionMetrics"):
+            for dm in analytics["dimensionMetrics"]:
+                if dm.get("dimensionValues", [{}])[0].get("value") == lid:
+                    metrics = {}
+                    for m in dm.get("metrics", []):
+                        metrics[m.get("name", "").lower()] = m.get("value")
+                    entry["analytics"] = metrics
+        # Merge offer details
+        for p in products:
+            for mf in p.get("metafields", []):
+                if mf["namespace"] == "ebay" and mf["key"] == "offer_id" and mf["value"] in offer_details:
+                    if str(p["id"]) == str(info["product_id"]):
+                        entry["offer_details"] = offer_details[mf["value"]]
+        result.append(entry)
+
+    return {"total": len(result), "listings": result, "raw_analytics": analytics}
+
+
+@router.post("/listings/refresh-status")
+async def ebay_refresh_listing_status():
+    """Refresh eBay status for all published listings by checking offer status."""
+    from app.services.shopify import shopify_client
+
+    products = await shopify_client.get_products_with_metafields()
+    updated = []
+
+    for p in products:
+        offer_id = None
+        has_listing = False
+        for mf in p.get("metafields", []):
+            if mf["namespace"] == "ebay" and mf["key"] == "offer_id":
+                offer_id = mf["value"]
+            if mf["namespace"] == "ebay" and mf["key"] == "listing_id":
+                has_listing = True
+
+        if not offer_id or not has_listing:
+            continue
+
+        try:
+            detail = await ebay_client.get_offer_details(offer_id)
+            if detail.get("status") != "error":
+                offer_status = detail.get("status", "UNKNOWN")
+                listing_status = detail.get("listing", {}).get("listingStatus", "")
+                # Map to simple status: ACTIVE, ENDED, ERROR
+                simple_status = "ACTIVE" if offer_status == "PUBLISHED" else offer_status
+                if listing_status in ("ENDED", "COMPLETED"):
+                    simple_status = "ENDED"
+
+                await shopify_client.set_product_metafield(
+                    p["id"], "ebay", "ebay_status", simple_status
+                )
+                sku = next((v["sku"] for v in p.get("variants", []) if v.get("sku")), None)
+                updated.append({
+                    "product_id": p["id"],
+                    "sku": sku,
+                    "offer_status": offer_status,
+                    "listing_status": listing_status,
+                    "ebay_status": simple_status,
+                })
+        except Exception as e:
+            updated.append({"product_id": p["id"], "error": str(e)})
+
+    return {"updated": len(updated), "results": updated}

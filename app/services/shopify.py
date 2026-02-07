@@ -121,6 +121,31 @@ class ShopifyAdminClient:
     async def get_product_metafields(self, product_id: int) -> dict:
         return await self._request("GET", f"products/{product_id}/metafields.json")
 
+    async def set_product_metafield(self, product_id: int, namespace: str, key: str, value: str, mf_type: str = "single_line_text_field") -> dict:
+        """Create or update a product metafield."""
+        return await self._request("POST", f"products/{product_id}/metafields.json", json_body={
+            "metafield": {
+                "namespace": namespace,
+                "key": key,
+                "value": value,
+                "type": mf_type,
+            }
+        })
+
+    async def set_product_metafields_bulk(self, product_id: int, metafields: list[dict]) -> list:
+        """Set multiple metafields on a product. Each dict: {key, value, type?}"""
+        results = []
+        for mf in metafields:
+            r = await self.set_product_metafield(
+                product_id,
+                namespace=mf.get("namespace", "ebay"),
+                key=mf["key"],
+                value=str(mf["value"]),
+                mf_type=mf.get("type", "single_line_text_field"),
+            )
+            results.append(r)
+        return results
+
     async def get_all_products(self) -> list:
         """Fetch ALL products using since_id pagination (250 per page)."""
         all_products = []

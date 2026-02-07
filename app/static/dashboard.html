@@ -260,6 +260,12 @@
     .ebay-status.ok { background: #22c55e18; color: var(--success); }
     .ebay-status.warn { background: #fb923c18; color: var(--warning); }
     .ebay-status.off { background: #ef444418; color: var(--danger); }
+    .ebay-live-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+    .ebay-live-badge.live { background: #22c55e18; color: var(--success); }
+    .ebay-live-badge.ended { background: #ef444418; color: var(--danger); }
+    .ebay-live-badge.none { background: var(--bg-tertiary); color: var(--text-tertiary); }
+    .ebay-listing-link { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--accent); text-decoration: none; }
+    .ebay-listing-link:hover { text-decoration: underline; }
     .ebay-select-table { width: 100%; }
     .ebay-select-table th, .ebay-select-table td { padding: 10px 8px; }
     .ebay-select-table input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
@@ -430,6 +436,33 @@
       // Build a display size string from width/height/rim
       result._size = [result.largeur, result.hauteur, result.rayon].filter(Boolean).join("/");
       return result;
+    }
+
+    function getEbayMeta(product) {
+      if (!product.metafields || !product.metafields.length) return null;
+      const ebay = {};
+      for (const mf of product.metafields) {
+        if (mf.namespace === "ebay") {
+          ebay[mf.key] = mf.value;
+        }
+      }
+      if (!ebay.listing_id) return null;
+      return ebay;
+    }
+
+    function renderEbayBadge(product) {
+      const ebay = getEbayMeta(product);
+      if (!ebay) return '<span class="ebay-live-badge none">—</span>';
+      const status = (ebay.ebay_status || "ACTIVE").toUpperCase();
+      const isLive = status === "ACTIVE" || status === "PUBLISHED";
+      const cls = isLive ? "live" : "ended";
+      const icon = isLive ? "🟢" : "🔴";
+      const url = ebay.ebay_url || `https://www.sandbox.ebay.fr/itm/${ebay.listing_id}`;
+      return `
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span class="ebay-live-badge ${cls}">${icon} ${isLive ? 'Live' : status}</span>
+          <a href="${url}" target="_blank" class="ebay-listing-link">#${ebay.listing_id}</a>
+        </div>`;
     }
 
     // Debug: log first product's metafields on load
@@ -972,6 +1005,27 @@
               </div>
             </div>
 
+            <!-- eBay Listings Summary -->
+            <div class="ebay-card">
+              <h3>📊 eBay Listings</h3>
+              ${(() => {
+                const liveCount = rows.filter(r => getEbayMeta(r.product)).length;
+                const totalCount = rows.length;
+                return `
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                    <span style="font-size:24px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${liveCount}</span>
+                    <span style="font-size:12px;color:var(--text-secondary)">/ ${totalCount} listed on eBay</span>
+                  </div>
+                  <div style="background:var(--bg-tertiary);border-radius:6px;height:6px;overflow:hidden;margin-bottom:12px">
+                    <div style="background:var(--success);height:100%;width:${totalCount ? (liveCount/totalCount*100) : 0}%;border-radius:6px;transition:width .3s"></div>
+                  </div>
+                  <button class="btn" style="width:100%;font-size:11px" onclick="ebayRefreshStatus()">
+                    🔄 Refresh Listing Status
+                  </button>
+                `;
+              })()}
+            </div>
+
             <!-- Publish Log -->
             <div class="ebay-card">
               <h3>📋 Publish Log</h3>
@@ -1012,6 +1066,7 @@
                   <th>Price</th>
                   <th>Qty</th>
                   <th>Web</th>
+                  <th>eBay</th>
                 </tr></thead>
                 <tbody>
                   ${rows.map(r => {
@@ -1020,6 +1075,7 @@
                     const ws = getWebStatus(r.product, parseInt(qty) || 0);
                     const img = (r.product.images || [])[0];
                     const checked = state.ebay.selectedSkus.has(r.sku) ? "checked" : "";
+                    const ebayBadge = renderEbayBadge(r.product);
                     return `<tr>
                       <td><input type="checkbox" class="ebay-sku-cb" data-sku="${r.sku}" ${checked} onchange="ebayToggleSku('${r.sku}', this.checked)" /></td>
                       <td>${img ? `<img src="${img.src}" class="row-thumb" />` : `<div class="row-thumb-empty">—</div>`}</td>
@@ -1030,6 +1086,7 @@
                       <td class="mono">${price !== "—" ? money(price) : "—"}</td>
                       <td class="mono">${qty}</td>
                       <td><span class="web-status-badge ${ws.cls}">${ws.icon} ${ws.label}</span></td>
+                      <td>${ebayBadge}</td>
                     </tr>`;
                   }).join("")}
                 </tbody>
@@ -1156,11 +1213,34 @@
 
         alert(`Published: ${result.published}/${result.total}\nFailed: ${result.failed}`);
         state.ebay.selectedSkus.clear();
+        // Reload products to get updated eBay metafields
+        try {
+          const pRes = await apiFetch("/api/products/with-metafields");
+          state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));
+        } catch {}
         renderEbay(document.getElementById("content"));
       } catch (e) {
         alert("Publish error: " + e.message);
         btn.disabled = false;
         btn.textContent = "🚀 Publish to eBay France";
+      }
+    }
+
+    async function ebayRefreshStatus() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = "⏳ Refreshing...";
+      try {
+        const result = await apiPost("/api/ebay/listings/refresh-status", {});
+        // Reload products to get updated metafields
+        const pRes = await apiFetch("/api/products/with-metafields");
+        state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));
+        alert(`Refreshed ${result.updated} listing(s)`);
+        renderEbay(document.getElementById("content"));
+      } catch (e) {
+        alert("Refresh error: " + e.message);
+        btn.disabled = false;
+        btn.textContent = "🔄 Refresh Listing Status";
       }
     }
 

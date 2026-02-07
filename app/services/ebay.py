@@ -296,11 +296,41 @@ class EbayInventoryClient:
     # ── Taxonomy / Category Aspects ──────────────────────────────
     async def get_category_aspects(self, category_id: str) -> dict:
         """Get required and recommended aspects for a category."""
-        # First get the default category tree ID for EBAY_FR
         return await self._request(
             "GET",
             f"{self.taxonomy_base}/category_tree/71/get_item_aspects_for_category?category_id={category_id}"
         )
+
+    # ── Analytics / Listing Status ────────────────────────────────
+    async def get_offer_details(self, offer_id: str) -> dict:
+        """Get full offer details including listing status."""
+        return await self._request("GET", f"{self.base}/offer/{offer_id}")
+
+    async def get_listing_analytics(self, listing_ids: list[str]) -> dict:
+        """Get traffic stats (views, impressions) for listings.
+        Uses the Sell Analytics API traffic_report endpoint."""
+        if not listing_ids:
+            return {"results": []}
+        headers = await self._headers()
+        # Build filter for listing IDs
+        ids_str = ",".join(listing_ids)
+        url = (
+            f"https://api.{self.domain}/sell/analytics/v1/traffic_report"
+            f"?filter=listing_ids:{{{ids_str}}}"
+            f"&dimension=LISTING"
+            f"&metric=CLICK_THROUGH_RATE,LISTING_IMPRESSION_TOTAL,"
+            f"LISTING_VIEWS_TOTAL,SALES_CONVERSION_RATE,TRANSACTION"
+        )
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200 and resp.text.strip():
+                return resp.json()
+            if resp.status_code == 204 or not resp.text.strip():
+                return {"results": [], "note": "no analytics data yet"}
+            try:
+                return {"status": "error", "code": resp.status_code, "errors": resp.json()}
+            except Exception:
+                return {"status": "error", "code": resp.status_code, "errors": resp.text}
 
     # ── High-Level: Publish a Shopify product to eBay ─────────────
     async def publish_product(

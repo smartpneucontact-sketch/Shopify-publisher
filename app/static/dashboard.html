@@ -457,7 +457,7 @@
       const isLive = status === "ACTIVE" || status === "PUBLISHED";
       const cls = isLive ? "live" : "ended";
       const icon = isLive ? "🟢" : "🔴";
-      const url = ebay.ebay_url || `https://www.sandbox.ebay.fr/itm/${ebay.listing_id}`;
+      const url = ebay.ebay_url || `https://www.ebay.fr/itm/${ebay.listing_id}`;
       return `
         <div style="display:flex;flex-direction:column;gap:2px">
           <span class="ebay-live-badge ${cls}">${icon} ${isLive ? 'Live' : status}</span>
@@ -758,7 +758,7 @@
                 const studioTotal = studio ? studio.total : 0;
                 const studioCompleted = studio ? studio.completed : 0;
                 const studioPending = studio ? (studio.pending + studio.processing + studio.draft) : 0;
-                const isOnEbay = false; // future
+                const isOnEbay = !!getEbayMeta(r.product);
                 const isOnAmazon = false; // future
                 const isOnMarketplace = false; // future
                 return `<tr class="tire-row" onclick="openModal(${i})" style="cursor:pointer">
@@ -775,7 +775,7 @@
                   <td>
                     <div class="channel-indicators">
                       <span class="web-status-badge ${webStatus.cls}" title="${webStatus.title}">🌐 ${webStatus.label}</span>
-                      <span class="ch-dot ${isOnEbay ? 'on' : 'off'}" title="eBay">🏷️</span>
+                      ${isOnEbay ? `<a href="${getEbayMeta(r.product).ebay_url || '#'}" target="_blank" class="ch-dot on" title="Live on eBay — #${getEbayMeta(r.product).listing_id}" style="text-decoration:none">🏷️</a>` : `<span class="ch-dot off" title="Not on eBay">🏷️</span>`}
                       <span class="ch-dot ${isOnAmazon ? 'on' : 'off'}" title="Amazon">📦</span>
                       <span class="ch-dot ${isOnMarketplace ? 'on' : 'off'}" title="Marketplace">🏪</span>
                     </div>
@@ -860,7 +860,7 @@
               <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-tertiary);font-weight:500">Channels</span>
               <div class="channel-indicators" style="gap:6px">
                 <span class="web-status-badge ${webStatus.cls}" style="font-size:12px;padding:4px 10px" title="${webStatus.title}">🌐 ${webStatus.label}</span>
-                <span class="ch-dot off" title="eBay" style="width:30px;height:30px;font-size:15px">🏷️</span>
+                ${getEbayMeta(p) ? `<a href="${getEbayMeta(p).ebay_url || '#'}" target="_blank" class="ch-dot on" title="Live on eBay — #${getEbayMeta(p).listing_id}" style="width:30px;height:30px;font-size:15px;text-decoration:none">🏷️</a>` : `<span class="ch-dot off" title="Not on eBay" style="width:30px;height:30px;font-size:15px">🏷️</span>`}
                 <span class="ch-dot off" title="Amazon" style="width:30px;height:30px;font-size:15px">📦</span>
                 <span class="ch-dot off" title="Marketplace" style="width:30px;height:30px;font-size:15px">🏪</span>
               </div>

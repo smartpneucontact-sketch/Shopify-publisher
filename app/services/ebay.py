@@ -23,10 +23,12 @@ if EBAY_ENV == "sandbox":
     EBAY_API_BASE = "https://api.sandbox.ebay.com"
     EBAY_AUTH_URL = "https://auth.sandbox.ebay.com/oauth2/authorize"
     EBAY_TOKEN_URL = "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
+    EBAY_LISTING_URL = "https://www.sandbox.ebay.fr/itm"
 else:
     EBAY_API_BASE = "https://api.ebay.com"
     EBAY_AUTH_URL = "https://auth.ebay.com/oauth2/authorize"
     EBAY_TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
+    EBAY_LISTING_URL = "https://www.ebay.fr/itm"
 
 EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "")
 EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "")
@@ -435,7 +437,7 @@ class EbayInventoryClient:
                     "sku": sku,
                     "offer_id": existing_offer_id,
                     "listing_id": listing_id,
-                    "ebay_url": f"https://www.ebay.fr/itm/{listing_id}" if listing_id else None,
+                    "ebay_url": f"{EBAY_LISTING_URL}/{listing_id}" if listing_id else None,
                     "note": "updated and published existing offer",
                 }
             return {"step": "create_offer", **offer_result}
@@ -455,7 +457,7 @@ class EbayInventoryClient:
             "sku": sku,
             "offer_id": offer_id,
             "listing_id": listing_id,
-            "ebay_url": f"https://www.ebay.fr/itm/{listing_id}" if listing_id else None,
+            "ebay_url": f"{EBAY_LISTING_URL}/{listing_id}" if listing_id else None,
         }
 
 

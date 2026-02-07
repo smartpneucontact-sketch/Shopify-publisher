@@ -397,15 +397,8 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
         # eBay title limit is 80 chars
         ebay_title = ebay_title[:80]
 
-        # Build description with return reassurance tag
-        raw_desc = p.get("body_html", "") or p.get("title", "")
-        ebay_description = (
-            '<div style="padding:10px 0;margin-bottom:12px;border-bottom:2px solid #4CAF50">'
-            '<span style="font-size:15px;color:#4CAF50;font-weight:bold">'
-            '✅ Pas d\'inquiétude ! Les retours sont acceptés.'
-            '</span></div>'
-            + raw_desc
-        )
+        # Build description
+        ebay_description = p.get("body_html", "") or p.get("title", "")
 
         # Quantité = tire_count / 2 (sold in pairs)
         qty_mf = next((mf["value"] for mf in p.get("metafields", [])
@@ -545,15 +538,8 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
         ebay_title = p.get("title", "Pneu occasion")
     ebay_title = ebay_title[:80]
 
-    # Description with return tag
-    raw_desc = p.get("body_html", "") or p.get("title", "")
-    ebay_description = (
-        '<div style="padding:10px 0;margin-bottom:12px;border-bottom:2px solid #4CAF50">'
-        '<span style="font-size:15px;color:#4CAF50;font-weight:bold">'
-        '✅ Pas d\'inquiétude ! Les retours sont acceptés.'
-        '</span></div>'
-        + raw_desc
-    )
+    # Description
+    ebay_description = p.get("body_html", "") or p.get("title", "")
 
     # Quantité = tire_count / 2 (sold in pairs)
     qty_mf = next((mf["value"] for mf in p.get("metafields", [])
@@ -639,14 +625,7 @@ async def ebay_publish_debug_offer(
     tire_count = int(qty_mf) if qty_mf else 2
     quantity = max(1, tire_count // 2)
 
-    raw_desc = p.get("body_html", "") or p.get("title", "")
-    ebay_description = (
-        '<div style="padding:10px 0;margin-bottom:12px;border-bottom:2px solid #4CAF50">'
-        '<span style="font-size:15px;color:#4CAF50;font-weight:bold">'
-        '✅ Pas d\'inquiétude ! Les retours sont acceptés.'
-        '</span></div>'
-        + raw_desc
-    )
+    ebay_description = p.get("body_html", "") or p.get("title", "")
 
     offer_data = {
         "sku": sku,

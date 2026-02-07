@@ -265,6 +265,13 @@ class EbayInventoryClient:
     async def create_return_policy(self, data: dict) -> dict:
         return await self._request("POST", f"{self.account_base}/return_policy", json_body=data)
 
+    # ── Seller Programs (Opt-In) ─────────────────────────────────
+    async def get_opted_in_programs(self) -> dict:
+        return await self._request("GET", f"{self.account_base}/program/get_opted_in_programs")
+
+    async def opt_in_to_program(self, program_type: str = "SELLING_POLICY_MANAGEMENT") -> dict:
+        return await self._request("POST", f"{self.account_base}/program/opt_in", json_body={"programType": program_type})
+
     # ── Inventory Location ────────────────────────────────────────
     async def get_locations(self) -> dict:
         return await self._request("GET", f"{self.base}/location")

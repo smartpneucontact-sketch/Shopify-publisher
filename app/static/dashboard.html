@@ -1079,7 +1079,7 @@
       btn.disabled = true;
       btn.textContent = "⏳ Creating...";
       try {
-        const result = await apiPost("/api/ebay/policies/create-defaults", {});
+        const result = await apiFetch("/api/ebay/policies/create-defaults");
         const ok = ["fulfillment","payment","return"].filter(k => result[k] && !result[k].status?.includes("error")).length;
         alert(`Created ${ok}/3 policies. Reloading...`);
         renderEbay(document.getElementById("content"));

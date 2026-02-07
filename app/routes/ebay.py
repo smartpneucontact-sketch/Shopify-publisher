@@ -72,7 +72,7 @@ async def ebay_policies():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/policies/create-defaults")
+@router.api_route("/policies/create-defaults", methods=["GET", "POST"])
 async def ebay_create_default_policies():
     """Create default fulfillment, payment, and return policies for eBay France."""
     results = {}

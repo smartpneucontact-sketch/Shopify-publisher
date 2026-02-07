@@ -337,18 +337,22 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
                 key = mf["key"]
                 label_map = {
                     "model": "Modèle",
-                    "largeur": "Largeur du pneu",
+                    "largeur": "Largeur de pneu",
                     "hauteur": "Rapport d'aspect",
-                    "rayon": "Diamètre de la jante",
-                    "tread_depth": "Profondeur de la bande de roulement",
-                    "dot": "DOT",
+                    "rayon": "Diamètre",
+                    "tread_depth": "Profondeur des sculptures",
+                    "dot": "Code de date DOT",
                     "speed_index": "Indice de vitesse",
                     "load_index": "Indice de charge",
                     "tire_count": "Quantité",
                     "season": "Type de pneu",
                 }
                 if key in label_map and mf.get("value"):
-                    aspects[label_map[key]] = [str(mf["value"])]
+                    val = str(mf["value"])
+                    # Add "mm" suffix for tread depth if not already present
+                    if key == "tread_depth" and "mm" not in val:
+                        val = f"{val} mm"
+                    aspects[label_map[key]] = [val]
 
         # Brand comes from Shopify vendor field
         if p.get("vendor"):
@@ -365,10 +369,6 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
         # MPN — use SKU or "Non applicable"
         if "Numéro de pièce fabricant" not in aspects:
             aspects["Numéro de pièce fabricant"] = ["Non applicable"]
-
-        # Type de véhicule — default for passenger car tires
-        if "Type de véhicule" not in aspects:
-            aspects["Type de véhicule"] = ["Voiture"]
 
         # Get quantity from metafield or variant
         qty_mf = next((mf["value"] for mf in p.get("metafields", [])
@@ -433,18 +433,21 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
             key = mf["key"]
             label_map = {
                 "model": "Modèle",
-                "largeur": "Largeur du pneu",
+                "largeur": "Largeur de pneu",
                 "hauteur": "Rapport d'aspect",
-                "rayon": "Diamètre de la jante",
-                "tread_depth": "Profondeur de la bande de roulement",
-                "dot": "DOT",
+                "rayon": "Diamètre",
+                "tread_depth": "Profondeur des sculptures",
+                "dot": "Code de date DOT",
                 "speed_index": "Indice de vitesse",
                 "load_index": "Indice de charge",
                 "tire_count": "Quantité",
                 "season": "Type de pneu",
             }
             if key in label_map and mf.get("value"):
-                aspects[label_map[key]] = [str(mf["value"])]
+                val = str(mf["value"])
+                if key == "tread_depth" and "mm" not in val:
+                    val = f"{val} mm"
+                aspects[label_map[key]] = [val]
 
     # Brand comes from Shopify vendor field
     if p.get("vendor"):
@@ -461,10 +464,6 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
     # MPN — default to "Non applicable"
     if "Numéro de pièce fabricant" not in aspects:
         aspects["Numéro de pièce fabricant"] = ["Non applicable"]
-
-    # Type de véhicule — default for passenger car tires
-    if "Type de véhicule" not in aspects:
-        aspects["Type de véhicule"] = ["Voiture"]
 
     qty_mf = next((mf["value"] for mf in p.get("metafields", [])
                     if mf.get("key") == "tire_count"), None)

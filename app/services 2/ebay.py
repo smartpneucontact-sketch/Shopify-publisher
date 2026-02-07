@@ -179,8 +179,8 @@ class EbayInventoryClient:
                 headers=headers,
                 json=json_body,
             )
-            if resp.status_code == 204 or (resp.status_code == 200 and not resp.text.strip()):
-                return {"status": "success", "code": resp.status_code}
+            if resp.status_code == 204:
+                return {"status": "success", "code": 204}
             if resp.status_code >= 400:
                 try:
                     err = resp.json()
@@ -264,13 +264,6 @@ class EbayInventoryClient:
 
     async def create_return_policy(self, data: dict) -> dict:
         return await self._request("POST", f"{self.account_base}/return_policy", json_body=data)
-
-    # ── Seller Programs (Opt-In) ─────────────────────────────────
-    async def get_opted_in_programs(self) -> dict:
-        return await self._request("GET", f"{self.account_base}/program/get_opted_in_programs")
-
-    async def opt_in_to_program(self, program_type: str = "SELLING_POLICY_MANAGEMENT") -> dict:
-        return await self._request("POST", f"{self.account_base}/program/opt_in", json_body={"programType": program_type})
 
     # ── Inventory Location ────────────────────────────────────────
     async def get_locations(self) -> dict:

@@ -62,25 +62,6 @@ async def ebay_set_token(request: Request):
     return {"status": "saved"}
 
 
-# ── Seller Programs (Opt-In) ─────────────────────────────────
-@router.get("/programs")
-async def ebay_programs():
-    """Check which eBay seller programs the account is opted into."""
-    try:
-        return await ebay_client.get_opted_in_programs()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.api_route("/programs/opt-in", methods=["GET", "POST"])
-async def ebay_opt_in_policies():
-    """Opt in to eBay Selling Policy Management (required before creating business policies)."""
-    try:
-        return await ebay_client.opt_in_to_program("SELLING_POLICY_MANAGEMENT")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 # ── Policies ──────────────────────────────────────────────────────
 @router.get("/policies")
 async def ebay_policies():
@@ -91,7 +72,7 @@ async def ebay_policies():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.api_route("/policies/create-defaults", methods=["GET", "POST"])
+@router.post("/policies/create-defaults")
 async def ebay_create_default_policies():
     """Create default fulfillment, payment, and return policies for eBay France."""
     results = {}
@@ -101,7 +82,6 @@ async def ebay_create_default_policies():
         results["fulfillment"] = await ebay_client.create_fulfillment_policy({
             "name": "Expédition Standard FR",
             "marketplaceId": "EBAY_FR",
-            "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
             "handlingTime": {"value": 3, "unit": "DAY"},
             "shippingOptions": [{
                 "optionType": "DOMESTIC",
@@ -109,9 +89,8 @@ async def ebay_create_default_policies():
                 "shippingServices": [{
                     "sortOrder": 1,
                     "shippingCarrierCode": "Colissimo",
-                    "shippingServiceCode": "FR_ColiposteColissimo",
+                    "shippingServiceCode": "FR_ColossimoColissimo",
                     "shippingCost": {"value": "10.00", "currency": "EUR"},
-                    "additionalShippingCost": {"value": "5.00", "currency": "EUR"},
                     "freeShipping": False,
                 }]
             }]
@@ -119,12 +98,12 @@ async def ebay_create_default_policies():
     except Exception as e:
         results["fulfillment"] = {"status": "error", "detail": str(e)}
 
-    # Payment policy — eBay managed payments (standard for EBAY_FR)
+    # Payment policy
     try:
         results["payment"] = await ebay_client.create_payment_policy({
             "name": "Paiement Standard",
             "marketplaceId": "EBAY_FR",
-            "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
+            "paymentMethods": [{"paymentMethodType": "PERSONAL_CHECK"}],
             "immediatePay": False,
         })
     except Exception as e:
@@ -135,7 +114,6 @@ async def ebay_create_default_policies():
         results["return"] = await ebay_client.create_return_policy({
             "name": "Retours 30 jours",
             "marketplaceId": "EBAY_FR",
-            "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
             "returnsAccepted": True,
             "returnPeriod": {"value": 30, "unit": "DAY"},
             "returnShippingCostPayer": "BUYER",
@@ -153,54 +131,6 @@ async def ebay_locations():
     """Get eBay inventory locations."""
     try:
         return await ebay_client.get_locations()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.api_route("/locations/create-default", methods=["GET", "POST"])
-async def ebay_create_default_location():
-    """Create the default warehouse inventory location for eBay France."""
-    try:
-        return await ebay_client.create_location("default", {
-            "location": {
-                "address": {
-                    "addressLine1": "1 rue Peyerimhoff",
-                    "city": "Freyming-Merlebach",
-                    "stateOrProvince": "Grand Est",
-                    "postalCode": "57800",
-                    "country": "FR",
-                }
-            },
-            "locationTypes": ["WAREHOUSE"],
-            "name": "SmartPneu Entrepôt",
-            "merchantLocationStatus": "ENABLED",
-        })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.api_route("/policies/create-gls", methods=["GET", "POST"])
-async def ebay_create_gls_policy():
-    """Create a GLS fulfillment policy for eBay France."""
-    try:
-        return await ebay_client.create_fulfillment_policy({
-            "name": "Expédition GLS FR",
-            "marketplaceId": "EBAY_FR",
-            "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
-            "handlingTime": {"value": 3, "unit": "DAY"},
-            "shippingOptions": [{
-                "optionType": "DOMESTIC",
-                "costType": "FLAT_RATE",
-                "shippingServices": [{
-                    "sortOrder": 1,
-                    "shippingCarrierCode": "GLS",
-                    "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
-                    "shippingCost": {"value": "10.00", "currency": "EUR"},
-                    "additionalShippingCost": {"value": "5.00", "currency": "EUR"},
-                    "freeShipping": False,
-                }]
-            }]
-        })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

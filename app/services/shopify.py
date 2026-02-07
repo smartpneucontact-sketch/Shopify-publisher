@@ -233,6 +233,7 @@ class ShopifyAdminClient:
                     productType
                     vendor
                     bodyHtml
+                    tags
                     createdAt
                     updatedAt
                     productCategory {{
@@ -310,6 +311,7 @@ class ShopifyAdminClient:
                     "product_type": node.get("productType", ""),
                     "vendor": node.get("vendor", ""),
                     "body_html": node.get("bodyHtml", ""),
+                    "tags": ", ".join(node.get("tags", [])) if isinstance(node.get("tags"), list) else node.get("tags", ""),
                     "created_at": node.get("createdAt", ""),
                     "updated_at": node.get("updatedAt", ""),
                     "taxonomy_category": tax_name,

@@ -330,6 +330,12 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
         price = float(v.get("price", 0)) + req.price_adjustment
         images = [img["src"] for img in p.get("images", []) if img.get("src")]
 
+        # Collect raw metafield values for title building
+        meta_raw = {}
+        for mf in p.get("metafields", []):
+            if mf["namespace"] == "custom" and mf.get("value"):
+                meta_raw[mf["key"]] = str(mf["value"])
+
         # Build tire aspects from metafields
         aspects = {}
         for mf in p.get("metafields", []):
@@ -354,8 +360,52 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
                     aspects[label_map[key]] = [val]
 
         # Brand comes from Shopify vendor field
-        if p.get("vendor"):
-            aspects["Marque"] = [p["vendor"]]
+        brand = p.get("vendor", "")
+        if brand:
+            aspects["Marque"] = [brand]
+
+        # Build eBay title: Brand Model Width/Height RRim XL LoadSpeed
+        # Example: Michelin Primacy 3 205/45 R17 XL 88W
+        model = meta_raw.get("model", "")
+        largeur = meta_raw.get("largeur", "")
+        hauteur = meta_raw.get("hauteur", "")
+        rayon = meta_raw.get("rayon", "")
+        load_idx = meta_raw.get("load_index", "")
+        speed_idx = meta_raw.get("speed_index", "")
+
+        # Detect XL/Renforcé from original Shopify title or tags
+        original_title = (p.get("title", "") + " " + p.get("tags", "")).upper()
+        is_xl = "XL" in original_title or "RENFORCÉ" in original_title or "RENFORCE" in original_title or "EXTRA LOAD" in original_title
+
+        size_part = ""
+        if largeur and hauteur:
+            size_part = f"{largeur}/{hauteur}"
+        elif largeur:
+            size_part = largeur
+
+        rim_part = f"R{rayon}" if rayon else ""
+        xl_part = "XL" if is_xl else ""
+        index_part = f"{load_idx}{speed_idx}" if load_idx or speed_idx else ""
+
+        title_parts = [brand, model, size_part, rim_part, xl_part, index_part]
+        ebay_title = " ".join(part for part in title_parts if part).strip()
+
+        # Fallback to Shopify title if we couldn't build a good one
+        if len(ebay_title) < 10:
+            ebay_title = p.get("title", "Pneu occasion")
+
+        # eBay title limit is 80 chars
+        ebay_title = ebay_title[:80]
+
+        # Build description with return reassurance tag
+        raw_desc = p.get("body_html", "") or p.get("title", "")
+        ebay_description = (
+            '<div style="padding:10px 0;margin-bottom:12px;border-bottom:2px solid #4CAF50">'
+            '<span style="font-size:15px;color:#4CAF50;font-weight:bold">'
+            '✅ Pas d\'inquiétude ! Les retours sont acceptés.'
+            '</span></div>'
+            + raw_desc
+        )
 
         # Quantité = tire_count / 2 (sold in pairs)
         qty_mf = next((mf["value"] for mf in p.get("metafields", [])
@@ -377,8 +427,8 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
 
         result = await ebay_client.publish_product(
             sku=sku,
-            title=p.get("title", ""),
-            description=p.get("body_html", ""),
+            title=ebay_title,
+            description=ebay_description,
             price=max(0.01, price),
             quantity=max(1, quantity),
             condition="used",
@@ -443,6 +493,12 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
     v = entry["variant"]
     images = [img["src"] for img in p.get("images", []) if img.get("src")]
 
+    # Collect raw metafield values
+    meta_raw = {}
+    for mf in p.get("metafields", []):
+        if mf["namespace"] == "custom" and mf.get("value"):
+            meta_raw[mf["key"]] = str(mf["value"])
+
     aspects = {}
     for mf in p.get("metafields", []):
         if mf["namespace"] == "custom":
@@ -465,8 +521,39 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
                 aspects[label_map[key]] = [val]
 
     # Brand comes from Shopify vendor field
-    if p.get("vendor"):
-        aspects["Marque"] = [p["vendor"]]
+    brand = p.get("vendor", "")
+    if brand:
+        aspects["Marque"] = [brand]
+
+    # Build eBay title
+    model = meta_raw.get("model", "")
+    largeur = meta_raw.get("largeur", "")
+    hauteur = meta_raw.get("hauteur", "")
+    rayon = meta_raw.get("rayon", "")
+    load_idx = meta_raw.get("load_index", "")
+    speed_idx = meta_raw.get("speed_index", "")
+    original_title = (p.get("title", "") + " " + p.get("tags", "")).upper()
+    is_xl = "XL" in original_title or "RENFORCÉ" in original_title or "RENFORCE" in original_title or "EXTRA LOAD" in original_title
+
+    size_part = f"{largeur}/{hauteur}" if largeur and hauteur else largeur
+    rim_part = f"R{rayon}" if rayon else ""
+    xl_part = "XL" if is_xl else ""
+    index_part = f"{load_idx}{speed_idx}" if load_idx or speed_idx else ""
+    title_parts = [brand, model, size_part, rim_part, xl_part, index_part]
+    ebay_title = " ".join(part for part in title_parts if part).strip()
+    if len(ebay_title) < 10:
+        ebay_title = p.get("title", "Pneu occasion")
+    ebay_title = ebay_title[:80]
+
+    # Description with return tag
+    raw_desc = p.get("body_html", "") or p.get("title", "")
+    ebay_description = (
+        '<div style="padding:10px 0;margin-bottom:12px;border-bottom:2px solid #4CAF50">'
+        '<span style="font-size:15px;color:#4CAF50;font-weight:bold">'
+        '✅ Pas d\'inquiétude ! Les retours sont acceptés.'
+        '</span></div>'
+        + raw_desc
+    )
 
     # Quantité = tire_count / 2 (sold in pairs)
     qty_mf = next((mf["value"] for mf in p.get("metafields", [])
@@ -491,8 +578,8 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
         },
         "condition": "USED_EXCELLENT",
         "product": {
-            "title": p.get("title", "")[:80],
-            "description": p.get("body_html", "") or p.get("title", ""),
+            "title": ebay_title,
+            "description": ebay_description,
             "imageUrls": images[:12],
             "aspects": aspects,
         },
@@ -504,6 +591,8 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
     return {
         "sku": sku,
         "shopify_title": p.get("title"),
+        "ebay_title": ebay_title,
+        "is_xl": is_xl,
         "shopify_price": v.get("price"),
         "quantity": max(1, quantity),
         "images_count": len(images),
@@ -547,7 +636,17 @@ async def ebay_publish_debug_offer(
 
     qty_mf = next((mf["value"] for mf in p.get("metafields", [])
                     if mf.get("key") == "tire_count"), None)
-    quantity = int(qty_mf) if qty_mf else int(v.get("inventory_quantity", 1))
+    tire_count = int(qty_mf) if qty_mf else 2
+    quantity = max(1, tire_count // 2)
+
+    raw_desc = p.get("body_html", "") or p.get("title", "")
+    ebay_description = (
+        '<div style="padding:10px 0;margin-bottom:12px;border-bottom:2px solid #4CAF50">'
+        '<span style="font-size:15px;color:#4CAF50;font-weight:bold">'
+        '✅ Pas d\'inquiétude ! Les retours sont acceptés.'
+        '</span></div>'
+        + raw_desc
+    )
 
     offer_data = {
         "sku": sku,
@@ -555,7 +654,7 @@ async def ebay_publish_debug_offer(
         "format": "FIXED_PRICE",
         "availableQuantity": max(1, quantity),
         "categoryId": category_id,
-        "listingDescription": p.get("body_html", "") or p.get("title", ""),
+        "listingDescription": ebay_description,
         "listingPolicies": {
             "fulfillmentPolicyId": fulfillment_policy_id,
             "paymentPolicyId": payment_policy_id,

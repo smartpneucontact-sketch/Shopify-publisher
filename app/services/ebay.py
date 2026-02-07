@@ -262,6 +262,9 @@ class EbayInventoryClient:
     async def create_fulfillment_policy(self, data: dict) -> dict:
         return await self._request("POST", f"{self.account_base}/fulfillment_policy", json_body=data)
 
+    async def update_fulfillment_policy(self, policy_id: str, data: dict) -> dict:
+        return await self._request("PUT", f"{self.account_base}/fulfillment_policy/{policy_id}", json_body=data)
+
     async def create_payment_policy(self, data: dict) -> dict:
         return await self._request("POST", f"{self.account_base}/payment_policy", json_body=data)
 

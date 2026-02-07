@@ -205,6 +205,176 @@ async def ebay_create_gls_policy():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.api_route("/policies/add-eu-shipping/{policy_id}", methods=["GET", "POST"])
+async def ebay_add_eu_shipping(policy_id: str):
+    """
+    Update an existing fulfillment policy with 3-tier shipping:
+    - France: FREE
+    - DE/NL/BE/LU: €15
+    - Rest of EU: €20
+    """
+    try:
+        policy_data = {
+            "name": "GLS — FR Gratuit + EU",
+            "marketplaceId": "EBAY_FR",
+            "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
+            "handlingTime": {"value": 3, "unit": "DAY"},
+            "shippingOptions": [
+                {
+                    "optionType": "DOMESTIC",
+                    "costType": "FLAT_RATE",
+                    "shippingServices": [{
+                        "sortOrder": 1,
+                        "shippingCarrierCode": "GLS",
+                        "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                        "shippingCost": {"value": "0.00", "currency": "EUR"},
+                        "additionalShippingCost": {"value": "0.00", "currency": "EUR"},
+                        "freeShipping": True,
+                    }]
+                },
+                {
+                    "optionType": "INTERNATIONAL",
+                    "costType": "FLAT_RATE",
+                    "shippingServices": [
+                        {
+                            "sortOrder": 1,
+                            "shippingCarrierCode": "GLS",
+                            "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                            "shippingCost": {"value": "15.00", "currency": "EUR"},
+                            "additionalShippingCost": {"value": "10.00", "currency": "EUR"},
+                            "freeShipping": False,
+                            "shipToLocations": {
+                                "regionIncluded": [
+                                    {"regionName": "DE", "regionType": "COUNTRY"},
+                                    {"regionName": "NL", "regionType": "COUNTRY"},
+                                    {"regionName": "BE", "regionType": "COUNTRY"},
+                                    {"regionName": "LU", "regionType": "COUNTRY"},
+                                ]
+                            }
+                        },
+                        {
+                            "sortOrder": 2,
+                            "shippingCarrierCode": "GLS",
+                            "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                            "shippingCost": {"value": "20.00", "currency": "EUR"},
+                            "additionalShippingCost": {"value": "12.00", "currency": "EUR"},
+                            "freeShipping": False,
+                            "shipToLocations": {
+                                "regionIncluded": [
+                                    {"regionName": "European Union", "regionType": "WORLD_REGION"}
+                                ],
+                                "regionExcluded": [
+                                    {"regionName": "DE", "regionType": "COUNTRY"},
+                                    {"regionName": "NL", "regionType": "COUNTRY"},
+                                    {"regionName": "BE", "regionType": "COUNTRY"},
+                                    {"regionName": "LU", "regionType": "COUNTRY"},
+                                    {"regionName": "FR", "regionType": "COUNTRY"},
+                                ]
+                            }
+                        },
+                    ]
+                }
+            ]
+        }
+        result = await ebay_client.update_fulfillment_policy(policy_id, policy_data)
+        return {
+            "status": "success",
+            "policy_id": policy_id,
+            "tiers": {
+                "france": "GRATUIT",
+                "de_nl_be_lu": "€15",
+                "rest_of_eu": "€20",
+            },
+            "result": result,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.api_route("/policies/create-gls-eu", methods=["GET", "POST"])
+async def ebay_create_gls_eu_policy():
+    """
+    Create a new GLS fulfillment policy with 3-tier shipping:
+    - France: FREE
+    - DE/NL/BE/LU: €15
+    - Rest of EU: €20
+    """
+    try:
+        result = await ebay_client.create_fulfillment_policy({
+            "name": "GLS — FR Gratuit + EU",
+            "marketplaceId": "EBAY_FR",
+            "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
+            "handlingTime": {"value": 3, "unit": "DAY"},
+            "shippingOptions": [
+                {
+                    "optionType": "DOMESTIC",
+                    "costType": "FLAT_RATE",
+                    "shippingServices": [{
+                        "sortOrder": 1,
+                        "shippingCarrierCode": "GLS",
+                        "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                        "shippingCost": {"value": "0.00", "currency": "EUR"},
+                        "additionalShippingCost": {"value": "0.00", "currency": "EUR"},
+                        "freeShipping": True,
+                    }]
+                },
+                {
+                    "optionType": "INTERNATIONAL",
+                    "costType": "FLAT_RATE",
+                    "shippingServices": [
+                        {
+                            "sortOrder": 1,
+                            "shippingCarrierCode": "GLS",
+                            "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                            "shippingCost": {"value": "15.00", "currency": "EUR"},
+                            "additionalShippingCost": {"value": "10.00", "currency": "EUR"},
+                            "freeShipping": False,
+                            "shipToLocations": {
+                                "regionIncluded": [
+                                    {"regionName": "DE", "regionType": "COUNTRY"},
+                                    {"regionName": "NL", "regionType": "COUNTRY"},
+                                    {"regionName": "BE", "regionType": "COUNTRY"},
+                                    {"regionName": "LU", "regionType": "COUNTRY"},
+                                ]
+                            }
+                        },
+                        {
+                            "sortOrder": 2,
+                            "shippingCarrierCode": "GLS",
+                            "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                            "shippingCost": {"value": "20.00", "currency": "EUR"},
+                            "additionalShippingCost": {"value": "12.00", "currency": "EUR"},
+                            "freeShipping": False,
+                            "shipToLocations": {
+                                "regionIncluded": [
+                                    {"regionName": "European Union", "regionType": "WORLD_REGION"}
+                                ],
+                                "regionExcluded": [
+                                    {"regionName": "DE", "regionType": "COUNTRY"},
+                                    {"regionName": "NL", "regionType": "COUNTRY"},
+                                    {"regionName": "BE", "regionType": "COUNTRY"},
+                                    {"regionName": "LU", "regionType": "COUNTRY"},
+                                    {"regionName": "FR", "regionType": "COUNTRY"},
+                                ]
+                            }
+                        },
+                    ]
+                }
+            ]
+        })
+        return {
+            "status": "success",
+            "tiers": {
+                "france": "GRATUIT",
+                "de_nl_be_lu": "€15",
+                "rest_of_eu": "€20",
+            },
+            "result": result,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Category Aspects ──────────────────────────────────────────────
 @router.get("/category-aspects/{category_id}")
 async def ebay_category_aspects(category_id: str):

@@ -433,22 +433,18 @@ async def ebay_shipping_services(search: str = Query(default="", description="Fi
     """Get all available shipping services for eBay France. Optionally filter by name."""
     try:
         result = await ebay_client.get_shipping_services("EBAY_FR")
-        services = result.get("shippingServices", [])
-        if search:
+        # Try multiple possible response keys
+        services = (result.get("shippingServices", [])
+                    or result.get("shippingService", [])
+                    or result.get("ShippingService", []))
+        if search and services:
             search_lower = search.lower()
-            services = [s for s in services if search_lower in s.get("name", "").lower()
-                        or search_lower in s.get("shippingServiceCode", "").lower()
-                        or search_lower in s.get("shippingCarrierCode", "").lower()]
+            services = [s for s in services if search_lower in str(s).lower()]
         return {
             "total": len(services),
             "search": search or "(all)",
-            "services": [{
-                "name": s.get("name"),
-                "code": s.get("shippingServiceCode"),
-                "carrier": s.get("shippingCarrierCode"),
-                "international": s.get("internationalShipping", False),
-                "shippingCategory": s.get("shippingCategory"),
-            } for s in services]
+            "services": services[:50],
+            "raw_keys": list(result.keys()) if isinstance(result, dict) else str(type(result)),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

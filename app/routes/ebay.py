@@ -216,10 +216,10 @@ async def ebay_create_default_location():
 
 @router.api_route("/policies/create-gls", methods=["GET", "POST"])
 async def ebay_create_gls_policy():
-    """Create a GLS fulfillment policy for eBay France."""
+    """Create a Colissimo fulfillment policy for eBay France."""
     try:
         return await ebay_client.create_fulfillment_policy({
-            "name": "Expédition GLS FR",
+            "name": "Expédition Colissimo FR",
             "marketplaceId": "EBAY_FR",
             "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
             "handlingTime": {"value": 3, "unit": "DAY"},
@@ -228,8 +228,8 @@ async def ebay_create_gls_policy():
                 "costType": "FLAT_RATE",
                 "shippingServices": [{
                     "sortOrder": 1,
-                    "shippingCarrierCode": "GLS",
-                    "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                    "shippingCarrierCode": "Colissimo",
+                    "shippingServiceCode": "FR_ColiposteColissimo",
                     "shippingCost": {"value": "10.00", "currency": "EUR"},
                     "additionalShippingCost": {"value": "5.00", "currency": "EUR"},
                     "freeShipping": False,
@@ -250,7 +250,7 @@ async def ebay_add_eu_shipping(policy_id: str):
     """
     try:
         policy_data = {
-            "name": "GLS — FR Gratuit + EU",
+            "name": "Livraison FR Gratuit + EU",
             "marketplaceId": "EBAY_FR",
             "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
             "handlingTime": {"value": 3, "unit": "DAY"},
@@ -260,8 +260,8 @@ async def ebay_add_eu_shipping(policy_id: str):
                     "costType": "FLAT_RATE",
                     "shippingServices": [{
                         "sortOrder": 1,
-                        "shippingCarrierCode": "GLS",
-                        "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                        "shippingCarrierCode": "Colissimo",
+                        "shippingServiceCode": "FR_ColiposteColissimo",
                         "shippingCost": {"value": "0.00", "currency": "EUR"},
                         "additionalShippingCost": {"value": "0.00", "currency": "EUR"},
                         "freeShipping": True,
@@ -273,8 +273,7 @@ async def ebay_add_eu_shipping(policy_id: str):
                     "shippingServices": [
                         {
                             "sortOrder": 1,
-                            "shippingCarrierCode": "GLS",
-                            "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                            "shippingServiceCode": "FR_ColiposteColissimoInternational",
                             "shippingCost": {"value": "15.00", "currency": "EUR"},
                             "additionalShippingCost": {"value": "10.00", "currency": "EUR"},
                             "freeShipping": False,
@@ -289,8 +288,7 @@ async def ebay_add_eu_shipping(policy_id: str):
                         },
                         {
                             "sortOrder": 2,
-                            "shippingCarrierCode": "GLS",
-                            "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                            "shippingServiceCode": "FR_ColiposteColissimoInternational",
                             "shippingCost": {"value": "20.00", "currency": "EUR"},
                             "additionalShippingCost": {"value": "12.00", "currency": "EUR"},
                             "freeShipping": False,
@@ -329,14 +327,14 @@ async def ebay_add_eu_shipping(policy_id: str):
 @router.api_route("/policies/create-gls-eu", methods=["GET", "POST"])
 async def ebay_create_gls_eu_policy():
     """
-    Create a new GLS fulfillment policy with 3-tier shipping:
-    - France: FREE
+    Create a new fulfillment policy with 3-tier shipping:
+    - France: FREE (Colissimo)
     - DE/NL/BE/LU: €15
     - Rest of EU: €20
     """
     try:
         result = await ebay_client.create_fulfillment_policy({
-            "name": "GLS — FR Gratuit + EU",
+            "name": "Livraison FR Gratuit + EU",
             "marketplaceId": "EBAY_FR",
             "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
             "handlingTime": {"value": 3, "unit": "DAY"},
@@ -346,8 +344,8 @@ async def ebay_create_gls_eu_policy():
                     "costType": "FLAT_RATE",
                     "shippingServices": [{
                         "sortOrder": 1,
-                        "shippingCarrierCode": "GLS",
-                        "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                        "shippingCarrierCode": "Colissimo",
+                        "shippingServiceCode": "FR_ColiposteColissimo",
                         "shippingCost": {"value": "0.00", "currency": "EUR"},
                         "additionalShippingCost": {"value": "0.00", "currency": "EUR"},
                         "freeShipping": True,
@@ -359,8 +357,7 @@ async def ebay_create_gls_eu_policy():
                     "shippingServices": [
                         {
                             "sortOrder": 1,
-                            "shippingCarrierCode": "GLS",
-                            "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                            "shippingServiceCode": "FR_ColiposteColissimoInternational",
                             "shippingCost": {"value": "15.00", "currency": "EUR"},
                             "additionalShippingCost": {"value": "10.00", "currency": "EUR"},
                             "freeShipping": False,
@@ -375,8 +372,7 @@ async def ebay_create_gls_eu_policy():
                         },
                         {
                             "sortOrder": 2,
-                            "shippingCarrierCode": "GLS",
-                            "shippingServiceCode": "FR_AuteModeDenvoiDeColis",
+                            "shippingServiceCode": "FR_ColiposteColissimoInternational",
                             "shippingCost": {"value": "20.00", "currency": "EUR"},
                             "additionalShippingCost": {"value": "12.00", "currency": "EUR"},
                             "freeShipping": False,
@@ -428,6 +424,32 @@ async def ebay_category_aspects(category_id: str):
                         "values": [v.get("localizedValue") for v in aspect.get("aspectValues", [])[:20]],
                     })
         return {"category_id": category_id, "required_aspects": required, "full_response": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/shipping-services")
+async def ebay_shipping_services(search: str = Query(default="", description="Filter by name, e.g. 'GLS', 'Colissimo'")):
+    """Get all available shipping services for eBay France. Optionally filter by name."""
+    try:
+        result = await ebay_client.get_shipping_services("EBAY_FR")
+        services = result.get("shippingServices", [])
+        if search:
+            search_lower = search.lower()
+            services = [s for s in services if search_lower in s.get("name", "").lower()
+                        or search_lower in s.get("shippingServiceCode", "").lower()
+                        or search_lower in s.get("shippingCarrierCode", "").lower()]
+        return {
+            "total": len(services),
+            "search": search or "(all)",
+            "services": [{
+                "name": s.get("name"),
+                "code": s.get("shippingServiceCode"),
+                "carrier": s.get("shippingCarrierCode"),
+                "international": s.get("internationalShipping", False),
+                "shippingCategory": s.get("shippingCategory"),
+            } for s in services]
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

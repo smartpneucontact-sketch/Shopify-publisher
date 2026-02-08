@@ -279,29 +279,7 @@ async def ebay_add_eu_shipping(policy_id: str):
                             "freeShipping": False,
                             "shipToLocations": {
                                 "regionIncluded": [
-                                    {"regionName": "DE", "regionType": "COUNTRY"},
-                                    {"regionName": "NL", "regionType": "COUNTRY"},
-                                    {"regionName": "BE", "regionType": "COUNTRY"},
-                                    {"regionName": "LU", "regionType": "COUNTRY"},
-                                ]
-                            }
-                        },
-                        {
-                            "sortOrder": 2,
-                            "shippingServiceCode": "FR_StandardInternational",
-                            "shippingCost": {"value": "20.00", "currency": "EUR"},
-                            "additionalShippingCost": {"value": "12.00", "currency": "EUR"},
-                            "freeShipping": False,
-                            "shipToLocations": {
-                                "regionIncluded": [
-                                    {"regionName": "European Union", "regionType": "WORLD_REGION"}
-                                ],
-                                "regionExcluded": [
-                                    {"regionName": "DE", "regionType": "COUNTRY"},
-                                    {"regionName": "NL", "regionType": "COUNTRY"},
-                                    {"regionName": "BE", "regionType": "COUNTRY"},
-                                    {"regionName": "LU", "regionType": "COUNTRY"},
-                                    {"regionName": "FR", "regionType": "COUNTRY"},
+                                    {"regionName": "Europe", "regionType": "WORLD_REGION"}
                                 ]
                             }
                         },
@@ -315,8 +293,7 @@ async def ebay_add_eu_shipping(policy_id: str):
             "policy_id": policy_id,
             "tiers": {
                 "france": "GRATUIT",
-                "de_nl_be_lu": "€15",
-                "rest_of_eu": "€20",
+                "europe": "€15",
             },
             "result": result,
         }
@@ -363,29 +340,7 @@ async def ebay_create_gls_eu_policy():
                             "freeShipping": False,
                             "shipToLocations": {
                                 "regionIncluded": [
-                                    {"regionName": "DE", "regionType": "COUNTRY"},
-                                    {"regionName": "NL", "regionType": "COUNTRY"},
-                                    {"regionName": "BE", "regionType": "COUNTRY"},
-                                    {"regionName": "LU", "regionType": "COUNTRY"},
-                                ]
-                            }
-                        },
-                        {
-                            "sortOrder": 2,
-                            "shippingServiceCode": "FR_StandardInternational",
-                            "shippingCost": {"value": "20.00", "currency": "EUR"},
-                            "additionalShippingCost": {"value": "12.00", "currency": "EUR"},
-                            "freeShipping": False,
-                            "shipToLocations": {
-                                "regionIncluded": [
-                                    {"regionName": "European Union", "regionType": "WORLD_REGION"}
-                                ],
-                                "regionExcluded": [
-                                    {"regionName": "DE", "regionType": "COUNTRY"},
-                                    {"regionName": "NL", "regionType": "COUNTRY"},
-                                    {"regionName": "BE", "regionType": "COUNTRY"},
-                                    {"regionName": "LU", "regionType": "COUNTRY"},
-                                    {"regionName": "FR", "regionType": "COUNTRY"},
+                                    {"regionName": "Europe", "regionType": "WORLD_REGION"}
                                 ]
                             }
                         },
@@ -397,8 +352,7 @@ async def ebay_create_gls_eu_policy():
             "status": "success",
             "tiers": {
                 "france": "GRATUIT",
-                "de_nl_be_lu": "€15",
-                "rest_of_eu": "€20",
+                "europe": "€15",
             },
             "result": result,
         }

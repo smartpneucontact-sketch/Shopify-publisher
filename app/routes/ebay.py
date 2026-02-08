@@ -273,7 +273,7 @@ async def ebay_add_eu_shipping(policy_id: str):
                     "shippingServices": [
                         {
                             "sortOrder": 1,
-                            "shippingServiceCode": "FR_ColiposteColissimoInternational",
+                            "shippingServiceCode": "FR_StandardInternational",
                             "shippingCost": {"value": "15.00", "currency": "EUR"},
                             "additionalShippingCost": {"value": "10.00", "currency": "EUR"},
                             "freeShipping": False,
@@ -288,7 +288,7 @@ async def ebay_add_eu_shipping(policy_id: str):
                         },
                         {
                             "sortOrder": 2,
-                            "shippingServiceCode": "FR_ColiposteColissimoInternational",
+                            "shippingServiceCode": "FR_StandardInternational",
                             "shippingCost": {"value": "20.00", "currency": "EUR"},
                             "additionalShippingCost": {"value": "12.00", "currency": "EUR"},
                             "freeShipping": False,
@@ -357,7 +357,7 @@ async def ebay_create_gls_eu_policy():
                     "shippingServices": [
                         {
                             "sortOrder": 1,
-                            "shippingServiceCode": "FR_ColiposteColissimoInternational",
+                            "shippingServiceCode": "FR_StandardInternational",
                             "shippingCost": {"value": "15.00", "currency": "EUR"},
                             "additionalShippingCost": {"value": "10.00", "currency": "EUR"},
                             "freeShipping": False,
@@ -372,7 +372,7 @@ async def ebay_create_gls_eu_policy():
                         },
                         {
                             "sortOrder": 2,
-                            "shippingServiceCode": "FR_ColiposteColissimoInternational",
+                            "shippingServiceCode": "FR_StandardInternational",
                             "shippingCost": {"value": "20.00", "currency": "EUR"},
                             "additionalShippingCost": {"value": "12.00", "currency": "EUR"},
                             "freeShipping": False,
@@ -433,6 +433,8 @@ async def ebay_shipping_services(search: str = Query(default="", description="Fi
     """Get all available shipping services for eBay France. Optionally filter by name."""
     try:
         result = await ebay_client.get_shipping_services("EBAY_FR")
+        if result.get("status") == "error":
+            return result
         # Try multiple possible response keys
         services = (result.get("shippingServices", [])
                     or result.get("shippingService", [])

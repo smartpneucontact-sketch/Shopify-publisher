@@ -1,12 +1,47 @@
 """eBay integration routes — OAuth flow, publishing, policies, status."""
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 from app.services.ebay import ebay_tokens, ebay_client
+import hashlib
+import os
 
 router = APIRouter()
+
+# ── eBay Marketplace Account Deletion Notification ────────────────
+EBAY_VERIFICATION_TOKEN = os.getenv("EBAY_VERIFICATION_TOKEN", "")
+EBAY_NOTIFICATION_ENDPOINT = os.getenv("EBAY_NOTIFICATION_ENDPOINT", "")
+
+
+@router.get("/notifications/account-deletion")
+async def ebay_account_deletion_verify(challenge_code: str = Query(...)):
+    """
+    eBay verification challenge — responds with hash of
+    challengeCode + verificationToken + endpoint URL.
+    """
+    token = EBAY_VERIFICATION_TOKEN
+    endpoint = EBAY_NOTIFICATION_ENDPOINT
+    # Hash = SHA256(challengeCode + verificationToken + endpoint)
+    hash_input = challenge_code + token + endpoint
+    response_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+    return JSONResponse(
+        content={"challengeResponse": response_hash},
+        headers={"Content-Type": "application/json"},
+    )
+
+
+@router.post("/notifications/account-deletion")
+async def ebay_account_deletion_notification(request: Request):
+    """
+    Handle eBay marketplace account deletion notifications.
+    Log the event and return 200 OK.
+    """
+    body = await request.json()
+    print(f"🔔 eBay Account Deletion Notification: {body}")
+    # In production, you would delete user data here
+    return {"status": "ok"}
 
 
 # ── OAuth ─────────────────────────────────────────────────────────

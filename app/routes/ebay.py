@@ -552,9 +552,10 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
         load_idx = meta_raw.get("load_index", "")
         speed_idx = meta_raw.get("speed_index", "")
 
-        # Detect XL/Renforcé from original Shopify title or tags
+        # Detect XL/Renforcé from original Shopify title, tags, or collections
         original_title = (p.get("title", "") + " " + p.get("tags", "")).upper()
-        is_xl = "XL" in original_title or "RENFORCÉ" in original_title or "RENFORCE" in original_title or "EXTRA LOAD" in original_title
+        collections = [c.lower() for c in p.get("collections", [])]
+        is_xl = "XL" in original_title or "RENFORCÉ" in original_title or "RENFORCE" in original_title or "EXTRA LOAD" in original_title or any("renforc" in c or "extra load" in c or c == "xl" for c in collections)
 
         size_part = ""
         if largeur and hauteur:
@@ -595,7 +596,6 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
             aspects["Numéro de pièce fabricant"] = ["Non applicable"]
 
         # Runflat — check if product is in runflat collection
-        collections = [c.lower() for c in p.get("collections", [])]
         is_runflat = any("runflat" in c or "run flat" in c or "run-flat" in c for c in collections)
         aspects["Runflat"] = ["Oui"] if is_runflat else ["Non"]
 
@@ -710,7 +710,8 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
     load_idx = meta_raw.get("load_index", "")
     speed_idx = meta_raw.get("speed_index", "")
     original_title = (p.get("title", "") + " " + p.get("tags", "")).upper()
-    is_xl = "XL" in original_title or "RENFORCÉ" in original_title or "RENFORCE" in original_title or "EXTRA LOAD" in original_title
+    collections = [c.lower() for c in p.get("collections", [])]
+    is_xl = "XL" in original_title or "RENFORCÉ" in original_title or "RENFORCE" in original_title or "EXTRA LOAD" in original_title or any("renforc" in c or "extra load" in c or c == "xl" for c in collections)
 
     size_part = f"{largeur}/{hauteur}" if largeur and hauteur else largeur
     rim_part = f"R{rayon}" if rayon else ""
@@ -741,7 +742,6 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
         aspects["Numéro de pièce fabricant"] = ["Non applicable"]
 
     # Runflat — check if product is in runflat collection
-    collections = [c.lower() for c in p.get("collections", [])]
     is_runflat = any("runflat" in c or "run flat" in c or "run-flat" in c for c in collections)
     aspects["Runflat"] = ["Oui"] if is_runflat else ["Non"]
 

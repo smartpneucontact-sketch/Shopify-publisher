@@ -594,6 +594,11 @@ async def ebay_publish_bulk(req: BulkPublishRequest, request: Request):
         if "Numéro de pièce fabricant" not in aspects:
             aspects["Numéro de pièce fabricant"] = ["Non applicable"]
 
+        # Runflat — check if product is in runflat collection
+        collections = [c.lower() for c in p.get("collections", [])]
+        is_runflat = any("runflat" in c or "run flat" in c or "run-flat" in c for c in collections)
+        aspects["Runflat"] = ["Oui"] if is_runflat else ["Non"]
+
         # Inventory quantity = tire_count / 2
         quantity = quantite
 
@@ -735,6 +740,11 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
     if "Numéro de pièce fabricant" not in aspects:
         aspects["Numéro de pièce fabricant"] = ["Non applicable"]
 
+    # Runflat — check if product is in runflat collection
+    collections = [c.lower() for c in p.get("collections", [])]
+    is_runflat = any("runflat" in c or "run flat" in c or "run-flat" in c for c in collections)
+    aspects["Runflat"] = ["Oui"] if is_runflat else ["Non"]
+
     quantity = quantite
 
     item_data = {
@@ -758,6 +768,8 @@ async def ebay_publish_debug(sku: str, category_id: str = "179680"):
         "shopify_title": p.get("title"),
         "ebay_title": ebay_title,
         "is_xl": is_xl,
+        "is_runflat": is_runflat,
+        "collections": p.get("collections", []),
         "shopify_price": v.get("price"),
         "quantity": max(1, quantity),
         "images_count": len(images),

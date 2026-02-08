@@ -236,6 +236,14 @@ class ShopifyAdminClient:
                     tags
                     createdAt
                     updatedAt
+                    collections(first: 10) {{
+                      edges {{
+                        node {{
+                          title
+                          handle
+                        }}
+                      }}
+                    }}
                     productCategory {{
                       productTaxonomyNode {{
                         fullName
@@ -312,6 +320,7 @@ class ShopifyAdminClient:
                     "vendor": node.get("vendor", ""),
                     "body_html": node.get("bodyHtml", ""),
                     "tags": ", ".join(node.get("tags", [])) if isinstance(node.get("tags"), list) else node.get("tags", ""),
+                    "collections": [e["node"]["title"] for e in node.get("collections", {}).get("edges", [])],
                     "created_at": node.get("createdAt", ""),
                     "updated_at": node.get("updatedAt", ""),
                     "taxonomy_category": tax_name,

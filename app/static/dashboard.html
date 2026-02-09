@@ -1215,6 +1215,18 @@
           price_adjustment: priceAdj,
         });
 
+        // Log full results to console for debugging
+        console.group("📦 eBay Bulk Publish Results");
+        console.log("Summary:", { total: result.total, published: result.published, failed: result.failed });
+        (result.results || []).forEach(r => {
+          if (r.status === "published") {
+            console.log(`✅ ${r.sku} → listing #${r.listing_id}`);
+          } else {
+            console.error(`❌ ${r.sku} →`, r.errors || r.step || r);
+          }
+        });
+        console.groupEnd();
+
         // Update log
         (result.results || []).forEach(r => {
           state.ebay.publishLog.unshift({
@@ -1225,7 +1237,12 @@
           });
         });
 
-        alert(`Published: ${result.published}/${result.total}\nFailed: ${result.failed}`);
+        const failedSkus = (result.results || []).filter(r => r.status !== "published").map(r => r.sku);
+        if (failedSkus.length > 0) {
+          alert(`Published: ${result.published}/${result.total}\nFailed: ${result.failed}\n\n❌ Failed SKUs: ${failedSkus.join(", ")}\n\nCheck the Publish Log or browser console (F12) for details.`);
+        } else {
+          alert(`✅ All ${result.published} published successfully!`);
+        }
         state.ebay.selectedSkus.clear();
         // Reload products to get updated eBay metafields
         try {

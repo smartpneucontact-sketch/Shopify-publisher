@@ -154,7 +154,7 @@ class ShopifyAdminClient:
             while True:
                 resp = await client.get(
                     f"{self.base_url}/products.json",
-                    params={"limit": 250, "since_id": since_id, "status": "any"}
+                    params={"limit": 250, "since_id": since_id}
                 )
                 resp.raise_for_status()
                 batch = resp.json().get("products", [])
@@ -221,7 +221,7 @@ class ShopifyAdminClient:
             after = f', after: "{cursor}"' if cursor else ""
             query = f"""
             {{
-              products(first: 50, query: "status:active OR status:draft OR status:archived"{after}) {{
+              products(first: 50{after}) {{
                 edges {{
                   cursor
                   node {{
@@ -236,14 +236,6 @@ class ShopifyAdminClient:
                     tags
                     createdAt
                     updatedAt
-                    collections(first: 10) {{
-                      edges {{
-                        node {{
-                          title
-                          handle
-                        }}
-                      }}
-                    }}
                     productCategory {{
                       productTaxonomyNode {{
                         fullName
@@ -320,7 +312,6 @@ class ShopifyAdminClient:
                     "vendor": node.get("vendor", ""),
                     "body_html": node.get("bodyHtml", ""),
                     "tags": ", ".join(node.get("tags", [])) if isinstance(node.get("tags"), list) else node.get("tags", ""),
-                    "collections": [e["node"]["title"] for e in node.get("collections", {}).get("edges", [])],
                     "created_at": node.get("createdAt", ""),
                     "updated_at": node.get("updatedAt", ""),
                     "taxonomy_category": tax_name,

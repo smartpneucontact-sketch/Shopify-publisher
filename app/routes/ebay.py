@@ -829,6 +829,9 @@ async def ebay_publish_debug_offer(
             "fulfillmentPolicyId": fulfillment_policy_id,
             "paymentPolicyId": payment_policy_id,
             "returnPolicyId": return_policy_id,
+            "bestOfferTerms": {
+                "bestOfferEnabled": True,
+            },
         },
         "pricingSummary": {
             "price": {

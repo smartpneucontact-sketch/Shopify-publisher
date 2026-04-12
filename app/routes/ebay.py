@@ -1166,7 +1166,7 @@ async def record_ebay_sale(body: EbaySaleRequest):
     except Exception:
         pass  # Don't fail the sale recording
 
-    result = sales_db.record_sale(sale_data)
+    result = await sales_db.record_sale(sale_data)
     if not result:
         raise HTTPException(status_code=500, detail="Failed to record sale")
 
@@ -1285,7 +1285,7 @@ async def ebay_sync_inventory():
     try:
         if ebay_client.tokens.is_authenticated:
             orders = await ebay_client.get_all_recent_orders(days=90)
-            existing_sales = sales_db.get_sales(
+            existing_sales = await sales_db.get_sales(
                 channel="ebay", start_date=None, end_date=None,
                 sku=None, limit=10000, offset=0,
             )
@@ -1317,7 +1317,7 @@ async def ebay_sync_inventory():
                         "sold_at": creation_date,
                         "product_title": item.get("title", ""),
                     }
-                    result = sales_db.record_sale(sale_data)
+                    result = await sales_db.record_sale(sale_data)
                     if result:
                         import_result["imported_count"] += 1
                         existing_refs.add(line_ref)

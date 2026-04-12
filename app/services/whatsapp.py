@@ -66,7 +66,7 @@ async def check_and_remind() -> dict:
     today_start = now_paris.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Query today's sales across all channels
-    sales = sales_db.get_sales(
+    sales = await sales_db.get_sales(
         channel=None,
         start_date=today_start,
         end_date=None,

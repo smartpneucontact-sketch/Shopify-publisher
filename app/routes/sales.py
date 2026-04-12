@@ -18,6 +18,17 @@ from app.services.ebay import ebay_client
 router = APIRouter(prefix="/sales", tags=["sales"])
 
 
+def _map_sale(row: dict) -> dict:
+    """Map a DB row to SaleResponse-compatible dict (id→sale_id, ensure sold_at is str)."""
+    d = dict(row)
+    if "id" in d:
+        d["sale_id"] = str(d.pop("id"))
+    # Ensure sold_at is a string Pydantic can parse
+    if "sold_at" in d and not isinstance(d["sold_at"], str):
+        d["sold_at"] = str(d["sold_at"])
+    return d
+
+
 class SalesChannel(str, Enum):
     """Supported sales channels."""
     SHOPIFY = "shopify"
@@ -96,7 +107,7 @@ async def record_sale(sale: SaleRequest):
         # Convert enum to string
         sale_data["channel"] = sale_data["channel"].value
 
-        result = sales_db.record_sale(sale_data)
+        result = await sales_db.record_sale(sale_data)
 
         if not result:
             raise HTTPException(
@@ -104,7 +115,7 @@ async def record_sale(sale: SaleRequest):
                 detail="Failed to record sale in database"
             )
 
-        return SaleResponse(**result)
+        return SaleResponse(**_map_sale(result))
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -145,7 +156,7 @@ async def import_shopify_orders():
         for order in orders:
             try:
                 # Check if order already exists by order_ref
-                existing = sales_db.get_sales(
+                existing = await sales_db.get_sales(
                     channel="shopify",
                     start_date=None,
                     end_date=None,
@@ -183,7 +194,7 @@ async def import_shopify_orders():
                     "brand": order.get("vendor"),
                 }
 
-                result = sales_db.record_sale(sale_data)
+                result = await sales_db.record_sale(sale_data)
                 if result:
                     imported_count += 1
 
@@ -245,7 +256,7 @@ async def import_ebay_orders(
         errors = []
 
         # Pre-fetch existing eBay sales to check duplicates efficiently
-        existing_sales = sales_db.get_sales(
+        existing_sales = await sales_db.get_sales(
             channel="ebay",
             start_date=None,
             end_date=None,
@@ -290,7 +301,7 @@ async def import_ebay_orders(
                         "notes": f"eBay order {order_id} (no line items)",
                         "sold_at": creation_date or datetime.utcnow().isoformat(),
                     }
-                    result = sales_db.record_sale(sale_data)
+                    result = await sales_db.record_sale(sale_data)
                     if result:
                         imported_count += 1
                     continue
@@ -323,7 +334,7 @@ async def import_ebay_orders(
                         "product_title": title,
                     }
 
-                    result = sales_db.record_sale(sale_data)
+                    result = await sales_db.record_sale(sale_data)
                     if result:
                         imported_count += 1
                         existing_refs.add(line_ref)
@@ -379,7 +390,7 @@ async def list_sales(
     try:
         channel_value = channel.value if channel else None
 
-        sales = sales_db.get_sales(
+        sales = await sales_db.get_sales(
             channel=channel_value,
             start_date=start_date,
             end_date=end_date,
@@ -388,7 +399,7 @@ async def list_sales(
             offset=offset
         )
 
-        return [SaleResponse(**sale) for sale in sales]
+        return [SaleResponse(**_map_sale(s)) for s in sales]
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching sales: {str(e)}")
@@ -413,7 +424,7 @@ async def get_summary(
         HTTPException: If query fails
     """
     try:
-        summary = sales_db.get_revenue_summary(start_date, end_date)
+        summary = await sales_db.get_revenue_summary(start_date, end_date)
 
         if not summary:
             return RevenueSummary(
@@ -447,7 +458,7 @@ async def get_daily_revenue(
         HTTPException: If query fails
     """
     try:
-        daily_data = sales_db.get_daily_revenue(days)
+        daily_data = await sales_db.get_daily_revenue(days)
 
         if not daily_data:
             return {
@@ -484,7 +495,7 @@ async def get_channel_breakdown(
         HTTPException: If query fails
     """
     try:
-        breakdown = sales_db.get_channel_breakdown(start_date, end_date)
+        breakdown = await sales_db.get_channel_breakdown(start_date, end_date)
 
         if not breakdown:
             return {
@@ -529,7 +540,7 @@ async def update_sale(
         # Convert enum to string
         sale_data["channel"] = sale_data["channel"].value
 
-        result = sales_db.update_sale(sale_id, sale_data)
+        result = await sales_db.update_sale(sale_id, sale_data)
 
         if not result:
             raise HTTPException(
@@ -537,7 +548,7 @@ async def update_sale(
                 detail=f"Sale with ID {sale_id} not found"
             )
 
-        return SaleResponse(**result)
+        return SaleResponse(**_map_sale(result))
 
     except HTTPException:
         raise
@@ -560,7 +571,7 @@ async def delete_sale(sale_id: str):
         HTTPException: If sale not found or deletion fails
     """
     try:
-        success = sales_db.delete_sale(sale_id)
+        success = await sales_db.delete_sale(sale_id)
 
         if not success:
             raise HTTPException(

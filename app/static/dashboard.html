@@ -1533,16 +1533,16 @@
           .rs-empty { text-align: center; color: var(--text-tertiary); padding: 24px 0; font-size: 13px; }
 
           .rs-sale-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 0; border-bottom: 1px solid var(--border-subtle); gap: 6px;
+            padding: 10px 0; border-bottom: 1px solid var(--border-subtle);
           }
-          .rs-sale-main { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-          .rs-sale-sku { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: var(--accent); }
+          .rs-sale-top { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+          .rs-sale-sku { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: var(--accent); flex-shrink: 0; }
           .rs-sale-ch { font-size: 9px; font-weight: 700; letter-spacing: 0.3px; padding: 2px 5px; background: var(--bg-tertiary); border-radius: 4px; flex-shrink: 0; }
-          .rs-sale-details { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-          .rs-sale-price { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
-          .rs-sale-customer { font-size: 11px; color: var(--text-tertiary); max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-          .rs-sale-date { font-size: 10px; color: var(--text-tertiary); white-space: nowrap; }
+          .rs-sale-price { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; margin-left: auto; white-space: nowrap; flex-shrink: 0; }
+          .rs-sale-date { font-size: 10px; color: var(--text-tertiary); white-space: nowrap; flex-shrink: 0; }
+          .rs-sale-bottom { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+          .rs-sale-customer { font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .rs-sale-notes { font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
           .rs-pager-btn {
             padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border);
@@ -1554,7 +1554,6 @@
 
           @media (max-width: 600px) {
             .rs-page { padding: 0 6px; }
-            .rs-sale-customer { display: none; }
           }
         </style>
       `;
@@ -1584,20 +1583,22 @@
         return;
       }
 
-      listEl.innerHTML = page.map(s => `
+      listEl.innerHTML = page.map(s => {
+        const hasBottom = (s.customer_name) || (s.notes && s.notes !== 'Recorded from dashboard');
+        return `
         <div class="rs-sale-row">
-          <div class="rs-sale-main">
+          <div class="rs-sale-top">
             <span class="rs-sale-sku">${s.sku || '—'}</span>
             <span class="rs-sale-ch" style="color:${rsChColor(s.channel)}">${rsChLabel(s.channel)}</span>
-            ${s.notes && s.notes !== 'Recorded from dashboard' ? '<span class="rs-sale-notes">' + s.notes + '</span>' : ''}
-          </div>
-          <div class="rs-sale-details">
             <span class="rs-sale-price">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</span>
-            <span class="rs-sale-customer">${s.customer_name || ''}</span>
-            <span class="rs-sale-date">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</span>
+            <span class="rs-sale-date">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) + ' à ' + new Date(s.sold_at).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : ''}</span>
           </div>
-        </div>
-      `).join("");
+          ${hasBottom ? '<div class="rs-sale-bottom">' +
+            (s.customer_name ? '<span class="rs-sale-customer">' + s.customer_name + '</span>' : '') +
+            (s.notes && s.notes !== 'Recorded from dashboard' ? '<span class="rs-sale-notes">' + s.notes + '</span>' : '') +
+          '</div>' : ''}
+        </div>`;
+      }).join("");
 
       const totalPages = Math.ceil(allSales.length / RS_PAGE_SIZE);
       const currentPage = Math.floor(rsPageOffset / RS_PAGE_SIZE) + 1;

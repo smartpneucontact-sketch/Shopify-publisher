@@ -1120,6 +1120,83 @@ async def debug_active_skus():
     }
 
 
+class EbaySaleRequest(BaseModel):
+    sku: str
+    price: float
+    buyer_name: Optional[str] = None
+
+
+@router.post("/record-sale")
+async def record_ebay_sale(body: EbaySaleRequest):
+    """
+    Quick-record an eBay sale: saves to sales DB with channel=ebay,
+    updates eBay metafield to ENDED, and optionally zeros Shopify inventory.
+    """
+    from app.services.sales_db import sales_db
+    from app.services.shopify import shopify_client
+    from datetime import datetime
+
+    # Record in sales DB
+    sale_data = {
+        "sku": body.sku,
+        "channel": "ebay",
+        "sale_price": body.price,
+        "quantity": 1,
+        "order_ref": f"manual-ebay-{body.sku}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+        "customer_name": body.buyer_name or "",
+        "notes": "Recorded from eBay dashboard",
+        "sold_at": datetime.utcnow(),
+    }
+
+    # Try to get product title from Shopify
+    try:
+        products = await shopify_client.get_products(limit=1, fields="id,title,variants", **{"sku": body.sku})
+        # Search by SKU across all products
+        all_products = await shopify_client.get_all_products()
+        for p in all_products:
+            for v in p.get("variants", []):
+                if v.get("sku") == body.sku:
+                    sale_data["product_title"] = p.get("title", "")
+                    sale_data["brand"] = p.get("vendor", "")
+                    # Update eBay metafield to ENDED
+                    await shopify_client.set_product_metafield(
+                        p["id"], "ebay", "ebay_status", "ENDED"
+                    )
+                    break
+    except Exception:
+        pass  # Don't fail the sale recording
+
+    result = sales_db.record_sale(sale_data)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to record sale")
+
+    return {"status": "recorded", "sale": result}
+
+
+class SyncSaleShopifyRequest(BaseModel):
+    sku: str
+
+
+@router.post("/sync-sale-shopify")
+async def sync_sale_to_shopify(body: SyncSaleShopifyRequest):
+    """Set Shopify inventory to 0 for a specific SKU (after eBay sale)."""
+    from app.services.shopify import shopify_client
+
+    # Find the product by SKU
+    all_products = await shopify_client.get_all_products()
+    for p in all_products:
+        for v in p.get("variants", []):
+            if v.get("sku") == body.sku:
+                result = await shopify_client.set_inventory_to_zero(p["id"])
+                # Also update eBay status metafield
+                await shopify_client.set_product_metafield(
+                    p["id"], "ebay", "ebay_status", "ENDED"
+                )
+                return {"status": "synced", "sku": body.sku, "result": result}
+
+    raise HTTPException(status_code=404, detail=f"SKU {body.sku} not found in Shopify")
+
+
 @router.post("/sync")
 async def ebay_sync_inventory():
     """

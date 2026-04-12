@@ -1058,6 +1058,32 @@
               </div>
             </div>
 
+            <!-- Record eBay Sale -->
+            <div class="ebay-card">
+              <h3>💰 Record eBay Sale</h3>
+              <form id="ebay-sale-form" onsubmit="recordEbaySale(event)" style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;gap:8px">
+                  <input type="text" id="sale-sku" placeholder="SKU (e.g. 1234)" required
+                    style="flex:1;padding:8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:13px">
+                  <input type="number" id="sale-price" placeholder="Price €" required step="0.01" min="0"
+                    style="width:100px;padding:8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:13px">
+                </div>
+                <input type="text" id="sale-buyer" placeholder="Buyer name (optional)"
+                  style="padding:8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:13px">
+                <div style="display:flex;gap:8px">
+                  <button type="submit" class="btn" style="flex:1;font-size:11px;background:#e53238;border-color:#e53238">
+                    💰 Record Sale
+                  </button>
+                  <button type="button" class="btn" style="flex:1;font-size:11px" onclick="syncSaleToShopify()">
+                    🔄 Sync → Shopify
+                  </button>
+                </div>
+              </form>
+              <div id="sale-message" style="margin-top:8px;font-size:11px;display:none"></div>
+              <div id="recent-ebay-sales" style="margin-top:12px;font-size:11px;color:var(--text-secondary)">
+              </div>
+            </div>
+
             <!-- Publish Log -->
             <div class="ebay-card">
               <h3>📋 Publish Log</h3>
@@ -1326,6 +1352,72 @@
         btn.textContent = "🔄 Sync eBay → Shopify";
       }
     }
+
+    // ── Record eBay Sale ──────────────────────────────────────────
+    async function recordEbaySale(event) {
+      event.preventDefault();
+      const sku = document.getElementById("sale-sku").value.trim();
+      const price = parseFloat(document.getElementById("sale-price").value);
+      const buyer = document.getElementById("sale-buyer").value.trim();
+      const msgEl = document.getElementById("sale-message");
+
+      if (!sku || !price) { msgEl.style.display = "block"; msgEl.style.color = "#f87171"; msgEl.textContent = "SKU and price required"; return; }
+
+      try {
+        const result = await apiPost("/api/ebay/record-sale", { sku, price, buyer_name: buyer });
+        msgEl.style.display = "block";
+        msgEl.style.color = "var(--success)";
+        msgEl.textContent = `✅ Sale recorded: SKU ${sku} — ${price}€`;
+        document.getElementById("ebay-sale-form").reset();
+        loadRecentEbaySales();
+        setTimeout(() => { msgEl.style.display = "none"; }, 5000);
+      } catch (e) {
+        msgEl.style.display = "block";
+        msgEl.style.color = "#f87171";
+        msgEl.textContent = "Error: " + e.message;
+      }
+    }
+
+    async function syncSaleToShopify() {
+      const sku = document.getElementById("sale-sku").value.trim();
+      if (!sku) { alert("Enter a SKU first to sync its inventory to 0 on Shopify"); return; }
+      if (!confirm(`Set Shopify inventory to 0 for SKU ${sku}?`)) return;
+
+      try {
+        const result = await apiPost("/api/ebay/sync-sale-shopify", { sku });
+        alert(`✅ SKU ${sku}: Shopify inventory set to 0`);
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+
+    async function loadRecentEbaySales() {
+      try {
+        const data = await apiFetch("/api/sales/?channel=ebay&limit=10");
+        const sales = Array.isArray(data) ? data : [];
+        const container = document.getElementById("recent-ebay-sales");
+        if (!container) return;
+        if (!sales.length) {
+          container.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:6px">No eBay sales recorded yet</div>';
+          return;
+        }
+        container.innerHTML = `
+          <div style="font-weight:600;margin-bottom:6px;color:var(--text-primary)">Recent eBay Sales</div>
+          ${sales.map(s => `
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+              <span style="font-family:'JetBrains Mono',monospace;color:var(--accent)">${s.sku}</span>
+              <span>${s.sale_price ? s.sale_price.toFixed(2) + '€' : '—'}</span>
+              <span style="color:var(--text-tertiary)">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR') : ''}</span>
+            </div>
+          `).join("")}
+        `;
+      } catch (e) {
+        console.error("Failed to load recent eBay sales:", e);
+      }
+    }
+
+    // Load recent sales when eBay tab renders
+    setTimeout(loadRecentEbaySales, 500);
 
     // ── Orders / Customers / Inventory (unchanged) ──────────────────
     async function renderOrders(el) {

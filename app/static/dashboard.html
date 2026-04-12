@@ -1058,32 +1058,6 @@
               </div>
             </div>
 
-            <!-- Record eBay Sale -->
-            <div class="ebay-card">
-              <h3>💰 Record eBay Sale</h3>
-              <form id="ebay-sale-form" onsubmit="recordEbaySale(event)" style="display:flex;flex-direction:column;gap:8px">
-                <div style="display:flex;gap:8px">
-                  <input type="text" id="sale-sku" placeholder="SKU (e.g. 1234)" required
-                    style="flex:1;padding:8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:13px">
-                  <input type="number" id="sale-price" placeholder="Price €" required step="0.01" min="0"
-                    style="width:100px;padding:8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:13px">
-                </div>
-                <input type="text" id="sale-buyer" placeholder="Buyer name (optional)"
-                  style="padding:8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:13px">
-                <div style="display:flex;gap:8px">
-                  <button type="submit" class="btn" style="flex:1;font-size:11px;background:#e53238;border-color:#e53238">
-                    💰 Record Sale
-                  </button>
-                  <button type="button" class="btn" style="flex:1;font-size:11px" onclick="syncSaleToShopify()">
-                    🔄 Sync → Shopify
-                  </button>
-                </div>
-              </form>
-              <div id="sale-message" style="margin-top:8px;font-size:11px;display:none"></div>
-              <div id="recent-ebay-sales" style="margin-top:12px;font-size:11px;color:var(--text-secondary)">
-              </div>
-            </div>
-
             <!-- Publish Log -->
             <div class="ebay-card">
               <h3>📋 Publish Log</h3>
@@ -1353,83 +1327,89 @@
       }
     }
 
-    // ── Record eBay Sale ──────────────────────────────────────────
-    async function recordEbaySale(event) {
-      event.preventDefault();
-      const sku = document.getElementById("sale-sku").value.trim();
-      const price = parseFloat(document.getElementById("sale-price").value);
-      const buyer = document.getElementById("sale-buyer").value.trim();
-      const msgEl = document.getElementById("sale-message");
-
-      if (!sku || !price) { msgEl.style.display = "block"; msgEl.style.color = "#f87171"; msgEl.textContent = "SKU and price required"; return; }
-
-      try {
-        const result = await apiPost("/api/ebay/record-sale", { sku, price, buyer_name: buyer });
-        msgEl.style.display = "block";
-        msgEl.style.color = "var(--success)";
-        msgEl.textContent = `✅ Sale recorded: SKU ${sku} — ${price}€`;
-        document.getElementById("ebay-sale-form").reset();
-        loadRecentEbaySales();
-        setTimeout(() => { msgEl.style.display = "none"; }, 5000);
-      } catch (e) {
-        msgEl.style.display = "block";
-        msgEl.style.color = "#f87171";
-        msgEl.textContent = "Error: " + e.message;
-      }
-    }
-
-    async function syncSaleToShopify() {
-      const sku = document.getElementById("sale-sku").value.trim();
-      if (!sku) { alert("Enter a SKU first to sync its inventory to 0 on Shopify"); return; }
-      if (!confirm(`Set Shopify inventory to 0 for SKU ${sku}?`)) return;
-
-      try {
-        const result = await apiPost("/api/ebay/sync-sale-shopify", { sku });
-        alert(`✅ SKU ${sku}: Shopify inventory set to 0`);
-      } catch (e) {
-        alert("Error: " + e.message);
-      }
-    }
-
-    async function loadRecentEbaySales() {
-      try {
-        const data = await apiFetch("/api/sales/?channel=ebay&limit=10");
-        const sales = Array.isArray(data) ? data : [];
-        const container = document.getElementById("recent-ebay-sales");
-        if (!container) return;
-        if (!sales.length) {
-          container.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:6px">No eBay sales recorded yet</div>';
-          return;
-        }
-        container.innerHTML = `
-          <div style="font-weight:600;margin-bottom:6px;color:var(--text-primary)">Recent eBay Sales</div>
-          ${sales.map(s => `
-            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-              <span style="font-family:'JetBrains Mono',monospace;color:var(--accent)">${s.sku}</span>
-              <span>${s.sale_price ? s.sale_price.toFixed(2) + '€' : '—'}</span>
-              <span style="color:var(--text-tertiary)">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR') : ''}</span>
-            </div>
-          `).join("")}
-        `;
-      } catch (e) {
-        console.error("Failed to load recent eBay sales:", e);
-      }
-    }
-
-    // Load recent sales when eBay tab renders
-    setTimeout(loadRecentEbaySales, 500);
-
-    // ── Orders / Customers / Inventory (unchanged) ──────────────────
+    // ── Orders / Customers / Inventory ────────────────────────────
     async function renderOrders(el) {
       el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div><div class="table-container"><table><tbody><tr><td colspan="6" class="loading-cell"><span class="pulse">Loading orders...</span></td></tr></tbody></table></div>`;
       try {
-        const [oRes, cRes] = await Promise.all([apiFetch("/api/orders?limit=50&status=any"), apiFetch("/api/orders/count")]);
+        const [oRes, cRes, salesRes] = await Promise.all([
+          apiFetch("/api/orders?limit=50&status=any"),
+          apiFetch("/api/orders/count"),
+          apiFetch("/api/sales/?limit=20").catch(() => [])
+        ]);
         const orders = oRes.orders || []; const count = cRes.count ?? 0;
         const paid = orders.filter(o => o.financial_status === "paid").length;
         const revenue = orders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0);
+        const recentSales = Array.isArray(salesRes) ? salesRes : [];
+
         el.innerHTML = `
           <div class="stats-grid fade-in">${statCard("Total Orders", count, true)}${statCard("Paid", paid)}${statCard("Revenue", money(revenue))}${statCard("Avg. Order", orders.length ? money(revenue / orders.length) : "—")}</div>
-          <div class="table-container fade-in"><div class="table-header"><h3>Recent Orders</h3></div>
+
+          <!-- Record Sale -->
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:20px" class="fade-in">
+            <div style="background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:10px;padding:20px">
+              <h3 style="margin:0 0 14px 0;font-size:14px;font-weight:600">Record a Sale</h3>
+              <form id="record-sale-form" onsubmit="recordInPersonSale(event)" style="display:flex;flex-direction:column;gap:10px">
+                <input type="text" id="rs-sku" placeholder="SKU" required
+                  style="padding:9px 12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:13px">
+                <div style="display:flex;gap:8px">
+                  <input type="number" id="rs-price" placeholder="Price (EUR)" required step="0.01" min="0"
+                    style="flex:1;padding:9px 12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:13px">
+                  <select id="rs-channel"
+                    style="width:130px;padding:9px 8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:12px">
+                    <option value="cash">Cash</option>
+                    <option value="ebay">eBay</option>
+                    <option value="leboncoin">Leboncoin</option>
+                    <option value="ebay_kleinanzeigen">Kleinanzeigen</option>
+                    <option value="shopify">Shopify</option>
+                  </select>
+                </div>
+                <input type="text" id="rs-customer" placeholder="Customer name (optional)"
+                  style="padding:9px 12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:13px">
+                <input type="text" id="rs-notes" placeholder="Notes (optional)"
+                  style="padding:9px 12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:13px">
+                <div style="display:flex;gap:8px">
+                  <button type="submit" class="btn btn-accent" style="flex:1;font-size:12px">
+                    Record Sale
+                  </button>
+                  <button type="button" class="btn" style="font-size:12px" onclick="syncSkuToShopify()">
+                    Sync Shopify
+                  </button>
+                </div>
+              </form>
+              <div id="rs-message" style="margin-top:10px;font-size:12px;display:none;padding:8px 10px;border-radius:6px"></div>
+            </div>
+
+            <div style="background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:10px;padding:20px">
+              <h3 style="margin:0 0 14px 0;font-size:14px;font-weight:600">Recent Sales</h3>
+              <div id="recent-sales-list" style="max-height:320px;overflow-y:auto">
+                ${recentSales.length === 0
+                  ? '<div style="text-align:center;color:var(--text-tertiary);padding:20px;font-size:13px">No sales recorded yet</div>'
+                  : `<table style="width:100%;font-size:12px;border-collapse:collapse">
+                      <thead><tr style="border-bottom:1px solid var(--border)">
+                        <th style="text-align:left;padding:6px 8px;color:var(--text-tertiary);font-weight:500">SKU</th>
+                        <th style="text-align:left;padding:6px 8px;color:var(--text-tertiary);font-weight:500">Channel</th>
+                        <th style="text-align:right;padding:6px 8px;color:var(--text-tertiary);font-weight:500">Price</th>
+                        <th style="text-align:left;padding:6px 8px;color:var(--text-tertiary);font-weight:500">Customer</th>
+                        <th style="text-align:right;padding:6px 8px;color:var(--text-tertiary);font-weight:500">Date</th>
+                      </tr></thead>
+                      <tbody>${recentSales.map(s => {
+                        const ch = s.channel || "—";
+                        const chColor = ch === "cash" ? "#22c55e" : ch === "ebay" ? "#e53238" : ch === "leboncoin" ? "#ff6e14" : "var(--accent)";
+                        return `<tr style="border-bottom:1px solid var(--border)">
+                          <td style="padding:7px 8px;font-family:'JetBrains Mono',monospace;color:var(--accent)">${s.sku}</td>
+                          <td style="padding:7px 8px"><span style="color:${chColor};font-weight:500;font-size:11px;text-transform:uppercase">${ch}</span></td>
+                          <td style="padding:7px 8px;text-align:right;font-family:'JetBrains Mono',monospace">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</td>
+                          <td style="padding:7px 8px;color:var(--text-secondary)">${s.customer_name || '—'}</td>
+                          <td style="padding:7px 8px;text-align:right;color:var(--text-tertiary);font-size:11px">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>
+                        </tr>`;
+                      }).join("")}</tbody>
+                    </table>`
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="table-container fade-in"><div class="table-header"><h3>Shopify Orders</h3></div>
           <table><thead><tr><th>Order</th><th>SKUs</th><th>Customer</th><th>Fulfillment</th><th>Payment</th><th>Total</th><th>Date</th></tr></thead>
           <tbody>${orders.length === 0 ? '<tr><td colspan="7" class="loading-cell">No orders</td></tr>' :
             orders.map(o => {
@@ -1438,6 +1418,54 @@
             }).join("")}
           </tbody></table></div>`;
       } catch (e) { el.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
+    }
+
+    // ── Record Sale (in-person / any channel) ───────────────────────
+    async function recordInPersonSale(event) {
+      event.preventDefault();
+      const sku = document.getElementById("rs-sku").value.trim();
+      const price = parseFloat(document.getElementById("rs-price").value);
+      const channel = document.getElementById("rs-channel").value;
+      const customer = document.getElementById("rs-customer").value.trim();
+      const notes = document.getElementById("rs-notes").value.trim();
+      const msgEl = document.getElementById("rs-message");
+
+      if (!sku || !price) { showMsg(msgEl, "SKU and price required", false); return; }
+
+      try {
+        const result = await apiPost("/api/sales/", {
+          sku, channel, sale_price: price, quantity: 1,
+          customer_name: customer || null,
+          notes: notes || "Recorded from dashboard"
+        });
+        showMsg(msgEl, `Sale recorded: SKU ${sku} — ${price.toFixed(2)} EUR (${channel})`, true);
+        document.getElementById("record-sale-form").reset();
+        // Refresh orders page to show updated recent sales
+        setTimeout(() => renderOrders(document.getElementById("content")), 1500);
+      } catch (e) {
+        showMsg(msgEl, "Error: " + e.message, false);
+      }
+    }
+
+    async function syncSkuToShopify() {
+      const sku = document.getElementById("rs-sku").value.trim();
+      if (!sku) { alert("Enter a SKU first to sync its inventory to 0 on Shopify"); return; }
+      if (!confirm(`Set Shopify inventory to 0 for SKU ${sku}?`)) return;
+
+      try {
+        const result = await apiPost("/api/sales/sync-shopify", { sku });
+        alert(`SKU ${sku}: Shopify inventory set to 0`);
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+
+    function showMsg(el, text, success) {
+      el.style.display = "block";
+      el.style.color = success ? "var(--success)" : "#f87171";
+      el.style.background = success ? "rgba(34,197,94,0.1)" : "rgba(248,113,113,0.1)";
+      el.textContent = (success ? "OK — " : "") + text;
+      if (success) setTimeout(() => { el.style.display = "none"; }, 5000);
     }
 
     async function renderCustomers(el) {

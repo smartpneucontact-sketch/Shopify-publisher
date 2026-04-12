@@ -574,3 +574,30 @@ async def delete_sale(sale_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting sale: {str(e)}")
+
+
+class SyncShopifyRequest(BaseModel):
+    sku: str = Field(..., description="SKU to sync (set inventory to 0 on Shopify)")
+
+
+@router.post("/sync-shopify")
+async def sync_sale_to_shopify(body: SyncShopifyRequest):
+    """
+    Set Shopify inventory to 0 for a specific SKU after an in-person or
+    marketplace sale. Also updates the eBay metafield to ENDED if present.
+    """
+    all_products = await shopify_client.get_all_products()
+    for p in all_products:
+        for v in p.get("variants", []):
+            if v.get("sku") == body.sku:
+                result = await shopify_client.set_inventory_to_zero(p["id"])
+                # Mark eBay status as ENDED if this product was listed
+                try:
+                    await shopify_client.set_product_metafield(
+                        p["id"], "ebay", "ebay_status", "ENDED"
+                    )
+                except Exception:
+                    pass
+                return {"status": "synced", "sku": body.sku, "result": result}
+
+    raise HTTPException(status_code=404, detail=f"SKU {body.sku} not found in Shopify")

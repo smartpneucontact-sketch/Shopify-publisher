@@ -976,13 +976,26 @@ async def ebay_listings_analytics():
 async def ebay_refresh_listing_status():
     """
     Refresh eBay status for all published listings.
-    Uses get_all_active_skus() as the source of truth — if eBay says
-    a SKU has a PUBLISHED offer, it's ACTIVE; otherwise it's ENDED.
+    Fetches all active SKUs from eBay offers, falls back to inventory items.
     """
     from app.services.shopify import shopify_client
 
     # Step 1: Get the authoritative set of active SKUs from eBay
     active_skus = await ebay_client.get_all_active_skus()
+    method_used = "offers"
+
+    # Fallback: if offers endpoint returned nothing, try inventory items
+    if not active_skus:
+        active_skus = await ebay_client.get_all_active_skus_by_inventory()
+        method_used = "inventory_items"
+
+    # Safety: if we still got 0, something is wrong with the API — don't mark everything as ENDED
+    if not active_skus:
+        return {
+            "updated": 0,
+            "error": "Could not fetch active SKUs from eBay. Both offers and inventory endpoints returned empty. Check eBay API connection.",
+            "method_tried": method_used,
+        }
 
     # Step 2: Check each Shopify product that was pushed to eBay
     products = await shopify_client.get_products_with_metafields()
@@ -1002,7 +1015,7 @@ async def ebay_refresh_listing_status():
         if not sku:
             continue
 
-        # Simple: is this SKU in eBay's active offers?
+        # Simple: is this SKU in eBay's active set?
         simple_status = "ACTIVE" if sku in active_skus else "ENDED"
 
         await shopify_client.set_product_metafield(
@@ -1022,7 +1035,36 @@ async def ebay_refresh_listing_status():
         "active": active_count,
         "ended": ended_count,
         "ebay_active_skus_count": len(active_skus),
+        "method": method_used,
         "results": updated,
+    }
+
+
+@router.get("/debug/active-skus")
+async def debug_active_skus():
+    """Debug endpoint: show what eBay returns as active SKUs."""
+    try:
+        active_from_offers = await ebay_client.get_all_active_skus()
+    except Exception as e:
+        active_from_offers = {"error": str(e)}
+
+    try:
+        active_from_inventory = await ebay_client.get_all_active_skus_by_inventory()
+    except Exception as e:
+        active_from_inventory = {"error": str(e)}
+
+    # Also try a raw offers call to see the response format
+    try:
+        raw_offers = await ebay_client.get_all_offers(limit=5, offset=0)
+    except Exception as e:
+        raw_offers = {"error": str(e)}
+
+    return {
+        "from_offers": list(active_from_offers) if isinstance(active_from_offers, set) else active_from_offers,
+        "from_offers_count": len(active_from_offers) if isinstance(active_from_offers, set) else 0,
+        "from_inventory": list(active_from_inventory) if isinstance(active_from_inventory, set) else active_from_inventory,
+        "from_inventory_count": len(active_from_inventory) if isinstance(active_from_inventory, set) else 0,
+        "raw_offers_sample": raw_offers,
     }
 
 
@@ -1040,8 +1082,16 @@ async def ebay_sync_inventory():
     from app.services.shopify import shopify_client
     from app.services.sales_db import sales_db
 
-    # Step 1: Get authoritative set of active SKUs from eBay
+    # Step 1: Get authoritative set of active SKUs from eBay (with fallback)
     active_skus = await ebay_client.get_all_active_skus()
+    if not active_skus:
+        active_skus = await ebay_client.get_all_active_skus_by_inventory()
+    if not active_skus:
+        return {
+            "error": "Could not fetch active SKUs from eBay. Check API connection.",
+            "total_checked": 0, "ended_and_zeroed": 0, "ended_products": [],
+            "sales_import": {}, "errors": [], "synced": [],
+        }
 
     products = await shopify_client.get_products_with_metafields()
     synced = []

@@ -226,30 +226,72 @@ class EbayInventoryClient:
         return await self._request("GET", f"{self.base}/offer?sku={sku}")
 
     async def get_all_offers(self, limit: int = 200, offset: int = 0) -> dict:
-        """Fetch all offers (paginated)."""
-        return await self._request("GET", f"{self.base}/offer?limit={limit}&offset={offset}")
+        """Fetch all offers (paginated). Requires format and marketplace_id."""
+        return await self._request(
+            "GET",
+            f"{self.base}/offer?format=FIXED_PRICE&marketplace_id={EBAY_MARKETPLACE}&limit={limit}&offset={offset}",
+        )
 
     async def get_all_active_skus(self) -> set:
         """
         Fetch ALL offers from eBay, return set of SKUs that have status PUBLISHED.
         This is the source of truth for what's actually live on eBay.
+        Falls back to per-SKU checking if the bulk endpoint fails.
         """
         active_skus = set()
         offset = 0
         limit = 200
 
-        while True:
-            result = await self.get_all_offers(limit=limit, offset=offset)
-            offers = result.get("offers", [])
-            if not offers:
-                break
-            for offer in offers:
-                if offer.get("status") == "PUBLISHED":
-                    active_skus.add(offer.get("sku", ""))
-            total = result.get("total", 0)
-            offset += limit
-            if offset >= total:
-                break
+        try:
+            while True:
+                result = await self.get_all_offers(limit=limit, offset=offset)
+                # Check for error response
+                if result.get("status") == "error" or result.get("errors"):
+                    print(f"⚠️ get_all_offers error at offset {offset}: {result}")
+                    break
+                offers = result.get("offers", [])
+                if not offers:
+                    break
+                for offer in offers:
+                    if offer.get("status") == "PUBLISHED":
+                        active_skus.add(offer.get("sku", ""))
+                total = result.get("total", 0)
+                offset += limit
+                if offset >= total:
+                    break
+        except Exception as e:
+            print(f"⚠️ get_all_active_skus error: {e}")
+
+        return active_skus
+
+    async def get_all_active_skus_by_inventory(self) -> set:
+        """
+        Fallback: fetch all inventory items and check which ones have quantity > 0.
+        """
+        active_skus = set()
+        offset = 0
+        limit = 100
+
+        try:
+            while True:
+                result = await self.get_items(limit=limit, offset=offset)
+                if result.get("status") == "error":
+                    break
+                items = result.get("inventoryItems", [])
+                if not items:
+                    break
+                for item in items:
+                    qty = item.get("availability", {}).get(
+                        "shipToLocationAvailability", {}
+                    ).get("quantity", 0)
+                    if qty and qty > 0:
+                        active_skus.add(item.get("sku", ""))
+                total = result.get("total", 0)
+                offset += limit
+                if offset >= total:
+                    break
+        except Exception as e:
+            print(f"⚠️ get_all_active_skus_by_inventory error: {e}")
 
         return active_skus
 

@@ -1422,7 +1422,7 @@
               <input type="text" id="rs-notes" placeholder="Any details">
             </div>
             <button type="submit" class="rs-submit" id="rs-submit-btn">Record Sale</button>
-            <button type="button" class="rs-sync-btn" onclick="rsSyncShopify()">Sync to Shopify (set stock to 0)</button>
+            <button type="button" class="rs-sync-btn" id="rs-sync-btn" onclick="rsSyncShopifyStep()">Sync to Shopify (set stock to 0)</button>
           </form>
 
           <div id="rs-toast" class="rs-toast"></div>
@@ -1687,15 +1687,49 @@
       }
     }
 
-    async function rsSyncShopify() {
+    let _syncArmed = false;
+    let _syncTimer = null;
+
+    function rsSyncShopifyStep() {
+      const btn = document.getElementById("rs-sync-btn");
       const sku = document.getElementById("rs-sku").value.trim();
-      if (!sku) { rsToast("Enter a SKU first", false); return; }
-      if (!confirm("Set Shopify inventory to 0 for SKU " + sku + "?")) return;
+      const noSku = document.getElementById("rs-no-sku").checked;
+      if (!sku && !noSku) { rsToast("Enter a SKU first", false); return; }
+      if (noSku) { rsToast("Cannot sync without a SKU", false); return; }
+
+      if (!_syncArmed) {
+        // First tap: arm it
+        _syncArmed = true;
+        btn.textContent = "Tap again to confirm: set " + sku + " to 0";
+        btn.style.borderColor = "var(--danger)";
+        btn.style.color = "var(--danger)";
+        // Auto-disarm after 4 seconds
+        clearTimeout(_syncTimer);
+        _syncTimer = setTimeout(() => {
+          _syncArmed = false;
+          btn.textContent = "Sync to Shopify (set stock to 0)";
+          btn.style.borderColor = "";
+          btn.style.color = "";
+        }, 4000);
+      } else {
+        // Second tap: execute
+        _syncArmed = false;
+        clearTimeout(_syncTimer);
+        btn.textContent = "Syncing...";
+        btn.style.borderColor = "";
+        btn.style.color = "";
+        rsSyncShopifyConfirmed(sku, btn);
+      }
+    }
+
+    async function rsSyncShopifyConfirmed(sku, btn) {
       try {
         await apiPost("/api/sales/sync-shopify", { sku });
         rsToast("Shopify stock zeroed for " + sku, true);
       } catch (e) {
         rsToast("Error: " + e.message, false);
+      } finally {
+        btn.textContent = "Sync to Shopify (set stock to 0)";
       }
     }
 
@@ -1773,7 +1807,11 @@
       state.apiUrl = document.getElementById("api-url-input").value.replace(/\/$/, "");
       state.connected = true;
       document.getElementById("sidebar-host").textContent = state.apiUrl ? new URL(state.apiUrl).host : window.location.host;
-      navigate("tires");
+      navigate(_defaultPage());
+    }
+
+    function _defaultPage() {
+      return window.innerWidth <= 900 ? "record-sale" : "tires";
     }
 
     // ── Auto-detect ─────────────────────────────────────────────────
@@ -1784,7 +1822,7 @@
           state.apiUrl = "";
           state.connected = true;
           document.getElementById("sidebar-host").textContent = window.location.host;
-          navigate("tires");
+          navigate(_defaultPage());
           return;
         }
       } catch (e) {}

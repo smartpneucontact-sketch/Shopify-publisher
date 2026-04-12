@@ -1023,15 +1023,23 @@
             <div class="ebay-card">
               <h3>📊 eBay Listings</h3>
               ${(() => {
-                const liveCount = rows.filter(r => getEbayMeta(r.product)).length;
+                const allEbay = rows.filter(r => getEbayMeta(r.product));
+                const activeCount = allEbay.filter(r => { const m = getEbayMeta(r.product); return m && m.ebay_status !== 'ENDED'; }).length;
+                const endedCount = allEbay.length - activeCount;
                 const totalCount = rows.length;
                 return `
-                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-                    <span style="font-size:24px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${liveCount}</span>
-                    <span style="font-size:12px;color:var(--text-secondary)">/ ${totalCount} listed on eBay</span>
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                    <span style="font-size:24px;font-weight:700;color:var(--success);font-family:'JetBrains Mono',monospace">${activeCount}</span>
+                    <span style="font-size:12px;color:var(--text-secondary)">active on eBay</span>
                   </div>
-                  <div style="background:var(--bg-tertiary);border-radius:6px;height:6px;overflow:hidden;margin-bottom:12px">
-                    <div style="background:var(--success);height:100%;width:${totalCount ? (liveCount/totalCount*100) : 0}%;border-radius:6px;transition:width .3s"></div>
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                    <span style="font-size:16px;font-weight:600;color:#e53238;font-family:'JetBrains Mono',monospace">${endedCount}</span>
+                    <span style="font-size:12px;color:var(--text-secondary)">sold / ended</span>
+                    <span style="font-size:12px;color:var(--text-secondary);margin-left:auto">${allEbay.length} total pushed / ${totalCount} in Shopify</span>
+                  </div>
+                  <div style="background:var(--bg-tertiary);border-radius:6px;height:6px;overflow:hidden;margin-bottom:12px;position:relative">
+                    <div style="background:var(--success);height:100%;width:${totalCount ? (activeCount/totalCount*100) : 0}%;border-radius:6px;transition:width .3s;position:absolute;left:0;top:0"></div>
+                    <div style="background:#e53238;height:100%;width:${totalCount ? (endedCount/totalCount*100) : 0}%;border-radius:6px;transition:width .3s;position:absolute;left:${totalCount ? (activeCount/totalCount*100) : 0}%;top:0"></div>
                   </div>
                   <button class="btn" style="width:100%;font-size:11px" onclick="ebayRefreshStatus()">
                     🔄 Refresh Listing Status

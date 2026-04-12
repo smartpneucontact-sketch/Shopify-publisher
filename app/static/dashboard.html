@@ -393,6 +393,10 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "HTTP " + res.status);
+      }
       return res.json();
     }
 
@@ -560,8 +564,12 @@
         : "";
     }
 
+    let _renderVersion = 0;
+
     function renderContent() {
       const el = document.getElementById("content");
+      _renderVersion++;
+      el.dataset.rv = _renderVersion;
       if (!state.connected && state.page !== "settings") {
         el.innerHTML = `<div class="empty-state"><p>Connect your API first in <strong style="color:var(--accent);cursor:pointer" onclick="navigate('settings')">Settings</strong></p></div>`;
         return;
@@ -579,6 +587,7 @@
 
     // ── TIRES PAGE ──────────────────────────────────────────────────
     async function renderTires(el) {
+      const myRv = _renderVersion;
       el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}${statCard("",null)}${statCard("",null)}${statCard("",null)}</div>
         <div style="text-align:center;padding:60px;color:var(--text-tertiary)"><span class="pulse">Loading all products with metafields — this may take a moment...</span></div>`;
 
@@ -588,6 +597,8 @@
           apiFetch("/api/products/count"),
           apiFetch("/api/studio/sku-counts").catch(() => ({ sku_counts: {} })),
         ]);
+        // Guard: don't overwrite if user navigated away during fetch
+        if (el.dataset.rv != myRv) return;
         state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));
         state.studioCounts = studioRes.sku_counts || {};
         debugMetafields();
@@ -922,17 +933,20 @@
 
     // ── EBAY PAGE ─────────────────────────────────────────────────
     async function renderEbay(el) {
+      const myRv = _renderVersion;
       el.innerHTML = `<div class="empty-state"><span class="pulse">Loading eBay module...</span></div>`;
 
       // Fetch eBay status
       let ebayStatus = { configured: false, authenticated: false };
       try { ebayStatus = await apiFetch("/api/ebay/status"); } catch {}
+      if (el.dataset.rv != myRv) return;
 
       // Fetch policies if authenticated
       let policies = { fulfillment: [], payment: [], return: [] };
       if (ebayStatus.authenticated) {
         try { policies = await apiFetch("/api/ebay/policies"); } catch {}
       }
+      if (el.dataset.rv != myRv) return;
       state.ebay.policies = policies;
 
       // Get Shopify products if not loaded
@@ -942,6 +956,7 @@
           state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));
         } catch {}
       }
+      if (el.dataset.rv != myRv) return;
 
       // Build flat rows
       const rows = [];

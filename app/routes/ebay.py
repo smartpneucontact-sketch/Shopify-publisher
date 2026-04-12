@@ -975,38 +975,35 @@ async def ebay_listings_analytics():
 @router.post("/listings/refresh-status")
 async def ebay_refresh_listing_status():
     """
-    Refresh eBay status for all published listings.
-    Fetches all active SKUs from eBay offers, falls back to inventory items.
+    Refresh eBay status by checking which SKUs have inventory qty > 0 on eBay.
+    SKUs with qty > 0 = ACTIVE, SKUs with qty = 0 or missing = ENDED (sold).
+    Only updates metafields for items whose status actually changed.
     """
+    import asyncio
     from app.services.shopify import shopify_client
 
-    # Step 1: Get the authoritative set of active SKUs from eBay
-    active_skus = await ebay_client.get_all_active_skus()
-    method_used = "offers"
+    # Step 1: Get SKUs with inventory on eBay (qty > 0)
+    active_skus = await ebay_client.get_all_active_skus_by_inventory()
 
-    # Fallback: if offers endpoint returned nothing, try inventory items
-    if not active_skus:
-        active_skus = await ebay_client.get_all_active_skus_by_inventory()
-        method_used = "inventory_items"
-
-    # Safety: if we still got 0, something is wrong with the API — don't mark everything as ENDED
     if not active_skus:
         return {
             "updated": 0,
-            "error": "Could not fetch active SKUs from eBay. Both offers and inventory endpoints returned empty. Check eBay API connection.",
-            "method_tried": method_used,
+            "error": "Could not fetch inventory from eBay. Check API connection.",
         }
 
-    # Step 2: Check each Shopify product that was pushed to eBay
+    # Step 2: Get Shopify products that were pushed to eBay
     products = await shopify_client.get_products_with_metafields()
     updated = []
+    to_update = []  # (product_id, new_status, sku)
 
     for p in products:
         has_listing = False
+        old_status = None
         for mf in p.get("metafields", []):
             if mf["namespace"] == "ebay" and mf["key"] == "listing_id":
                 has_listing = True
-                break
+            if mf["namespace"] == "ebay" and mf["key"] == "ebay_status":
+                old_status = mf["value"]
 
         if not has_listing:
             continue
@@ -1015,28 +1012,35 @@ async def ebay_refresh_listing_status():
         if not sku:
             continue
 
-        # Simple: is this SKU in eBay's active set?
-        simple_status = "ACTIVE" if sku in active_skus else "ENDED"
+        new_status = "ACTIVE" if sku in active_skus else "ENDED"
 
-        await shopify_client.set_product_metafield(
-            p["id"], "ebay", "ebay_status", simple_status
-        )
-        updated.append({
-            "product_id": p["id"],
-            "sku": sku,
-            "ebay_status": simple_status,
-        })
+        # Only update if status actually changed
+        if new_status != old_status:
+            to_update.append((p["id"], new_status, sku))
+
+        updated.append({"sku": sku, "ebay_status": new_status})
+
+    # Step 3: Batch update only changed metafields (in groups of 5 to avoid timeout)
+    changed = []
+    for i in range(0, len(to_update), 5):
+        batch = to_update[i:i + 5]
+        tasks = [
+            shopify_client.set_product_metafield(pid, "ebay", "ebay_status", status)
+            for pid, status, _ in batch
+        ]
+        await asyncio.gather(*tasks)
+        changed.extend([{"product_id": pid, "sku": sku, "new_status": status} for pid, status, sku in batch])
 
     active_count = sum(1 for u in updated if u["ebay_status"] == "ACTIVE")
     ended_count = sum(1 for u in updated if u["ebay_status"] == "ENDED")
 
     return {
-        "updated": len(updated),
+        "updated": len(changed),
+        "total_listed": len(updated),
         "active": active_count,
         "ended": ended_count,
-        "ebay_active_skus_count": len(active_skus),
-        "method": method_used,
-        "results": updated,
+        "ebay_inventory_count": len(active_skus),
+        "changed": changed,
     }
 
 
@@ -1044,27 +1048,13 @@ async def ebay_refresh_listing_status():
 async def debug_active_skus():
     """Debug endpoint: show what eBay returns as active SKUs."""
     try:
-        active_from_offers = await ebay_client.get_all_active_skus()
-    except Exception as e:
-        active_from_offers = {"error": str(e)}
-
-    try:
         active_from_inventory = await ebay_client.get_all_active_skus_by_inventory()
     except Exception as e:
         active_from_inventory = {"error": str(e)}
 
-    # Also try a raw offers call to see the response format
-    try:
-        raw_offers = await ebay_client.get_all_offers(limit=5, offset=0)
-    except Exception as e:
-        raw_offers = {"error": str(e)}
-
     return {
-        "from_offers": list(active_from_offers) if isinstance(active_from_offers, set) else active_from_offers,
-        "from_offers_count": len(active_from_offers) if isinstance(active_from_offers, set) else 0,
-        "from_inventory": list(active_from_inventory) if isinstance(active_from_inventory, set) else active_from_inventory,
+        "from_inventory": sorted(list(active_from_inventory)) if isinstance(active_from_inventory, set) else active_from_inventory,
         "from_inventory_count": len(active_from_inventory) if isinstance(active_from_inventory, set) else 0,
-        "raw_offers_sample": raw_offers,
     }
 
 
@@ -1082,10 +1072,8 @@ async def ebay_sync_inventory():
     from app.services.shopify import shopify_client
     from app.services.sales_db import sales_db
 
-    # Step 1: Get authoritative set of active SKUs from eBay (with fallback)
-    active_skus = await ebay_client.get_all_active_skus()
-    if not active_skus:
-        active_skus = await ebay_client.get_all_active_skus_by_inventory()
+    # Step 1: Get active SKUs from eBay inventory (qty > 0)
+    active_skus = await ebay_client.get_all_active_skus_by_inventory()
     if not active_skus:
         return {
             "error": "Could not fetch active SKUs from eBay. Check API connection.",

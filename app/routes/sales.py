@@ -81,6 +81,7 @@ class RevenueSummary(BaseModel):
     top_skus: list
 
 
+@router.post("", response_model=SaleResponse, status_code=201)
 @router.post("/", response_model=SaleResponse, status_code=201)
 async def record_sale(sale: SaleRequest):
     """
@@ -363,6 +364,7 @@ async def import_ebay_orders(
         )
 
 
+@router.get("", response_model=List[SaleResponse])
 @router.get("/", response_model=List[SaleResponse])
 async def list_sales(
     channel: Optional[SalesChannel] = Query(None, description="Filter by sales channel"),

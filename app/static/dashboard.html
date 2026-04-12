@@ -1395,32 +1395,37 @@
               <input type="checkbox" id="rs-no-sku">
               <span>No SKU</span>
             </label>
+
             <div class="rs-field" id="rs-sku-field">
-              <label for="rs-sku">SKU</label>
+              <label>SKU</label>
               <input type="text" id="rs-sku" inputmode="numeric" placeholder="e.g. 1234" required autofocus>
             </div>
-            <div class="rs-row">
-              <div class="rs-field" style="flex:1">
-                <label for="rs-price">Price (EUR)</label>
-                <input type="number" id="rs-price" inputmode="decimal" placeholder="0.00" required step="0.01" min="0">
-              </div>
-              <div class="rs-field" style="flex:1">
-                <label for="rs-channel">Channel</label>
-                <select id="rs-channel">
-                  <option value="cash">Cash</option>
-                  <option value="leboncoin">Leboncoin</option>
-                  <option value="ebay_kleinanzeigen">Kleinanzeigen</option>
-                </select>
+
+            <div class="rs-field">
+              <label>Price (EUR)</label>
+              <input type="number" id="rs-price" inputmode="decimal" placeholder="0.00" required step="0.01" min="0">
+            </div>
+
+            <div class="rs-field">
+              <label>Channel</label>
+              <input type="hidden" id="rs-channel" value="cash">
+              <div class="rs-pills" id="rs-pills">
+                <button type="button" class="rs-pill active" data-ch="cash" onclick="rsPickChannel(this)">Cash</button>
+                <button type="button" class="rs-pill" data-ch="leboncoin" onclick="rsPickChannel(this)">Leboncoin</button>
+                <button type="button" class="rs-pill" data-ch="ebay_kleinanzeigen" onclick="rsPickChannel(this)">Kleinanzeigen</button>
               </div>
             </div>
+
             <div class="rs-field">
-              <label for="rs-customer">Customer (optional)</label>
+              <label>Customer (optional)</label>
               <input type="text" id="rs-customer" placeholder="Name">
             </div>
+
             <div class="rs-field">
-              <label for="rs-notes">Notes (optional)</label>
+              <label>Notes (optional)</label>
               <input type="text" id="rs-notes" placeholder="Any details">
             </div>
+
             <button type="submit" class="rs-submit" id="rs-submit-btn">Record Sale</button>
             <button type="button" class="rs-sync-btn" id="rs-sync-btn" onclick="rsSyncShopifyStep()">Sync to Shopify (set stock to 0)</button>
           </form>
@@ -1438,29 +1443,30 @@
         </div>
 
         <style>
-          .rs-page { max-width: 520px; margin: 0 auto; padding: 0 4px; }
+          .rs-page {
+            max-width: 520px; margin: 0 auto; padding: 0 8px;
+            overflow-x: hidden; box-sizing: border-box;
+          }
 
-          .rs-today { text-align: center; padding: 20px 0 24px; }
-          .rs-today-count { font-size: 48px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--accent); line-height: 1; }
-          .rs-today-label { font-size: 14px; color: var(--text-tertiary); margin-top: 4px; }
-          .rs-today-revenue { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+          .rs-today { text-align: center; padding: 16px 0 20px; }
+          .rs-today-count { font-size: 44px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--accent); line-height: 1; }
+          .rs-today-label { font-size: 13px; color: var(--text-tertiary); margin-top: 4px; }
+          .rs-today-revenue { font-size: 17px; font-weight: 600; color: var(--text-primary); margin-top: 5px; font-family: 'JetBrains Mono', monospace; }
 
           .rs-checkbox-row {
             display: flex; align-items: center; gap: 10px; cursor: pointer;
-            padding: 10px 0 2px; font-size: 14px; color: var(--text-secondary);
+            padding: 8px 0 2px; font-size: 14px; color: var(--text-secondary);
             -webkit-tap-highlight-color: transparent; user-select: none;
           }
           .rs-checkbox-row input[type="checkbox"] {
-            width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer;
-            border-radius: 4px; flex-shrink: 0;
+            width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
           }
 
-          .rs-form { display: flex; flex-direction: column; gap: 14px; }
-          .rs-row { display: flex; gap: 10px; }
+          .rs-form { display: flex; flex-direction: column; gap: 12px; }
           .rs-field { display: flex; flex-direction: column; gap: 5px; }
-          .rs-field label { font-size: 12px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
-          .rs-field input, .rs-field select {
-            padding: 14px 14px;
+          .rs-field label { font-size: 11px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+          .rs-field input {
+            padding: 14px;
             background: var(--bg-secondary);
             border: 1px solid var(--border);
             border-radius: 10px;
@@ -1469,58 +1475,77 @@
             font-family: 'JetBrains Mono', monospace;
             -webkit-appearance: none;
             transition: border-color 0.15s;
+            width: 100%; box-sizing: border-box;
           }
-          .rs-field input:focus, .rs-field select:focus { outline: none; border-color: var(--accent); }
-          .rs-field input:disabled { opacity: 0.4; }
-          .rs-field select { font-family: 'DM Sans', sans-serif; font-size: 14px; }
+          .rs-field input:focus { outline: none; border-color: var(--accent); }
+          .rs-field input:disabled { opacity: 0.35; }
+
+          .rs-pills {
+            display: flex; gap: 8px; flex-wrap: wrap;
+          }
+          .rs-pill {
+            padding: 10px 16px; border-radius: 20px;
+            border: 1px solid var(--border); background: var(--bg-secondary);
+            color: var(--text-secondary); font-size: 13px; font-weight: 500;
+            cursor: pointer; -webkit-tap-highlight-color: transparent;
+            transition: all 0.15s; flex-shrink: 0;
+          }
+          .rs-pill:active { transform: scale(0.96); }
+          .rs-pill.active {
+            background: var(--accent); color: #0a0a0b;
+            border-color: var(--accent); font-weight: 600;
+          }
 
           .rs-submit {
             padding: 16px; background: var(--accent); color: #0a0a0b; border: none;
             border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;
-            transition: opacity 0.15s; margin-top: 4px; -webkit-tap-highlight-color: transparent;
+            transition: opacity 0.15s; margin-top: 2px;
+            -webkit-tap-highlight-color: transparent;
+            width: 100%; box-sizing: border-box;
           }
           .rs-submit:active { opacity: 0.8; }
           .rs-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
           .rs-sync-btn {
-            padding: 12px; background: transparent; color: var(--text-secondary);
-            border: 1px solid var(--border); border-radius: 10px; font-size: 13px;
-            cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+            padding: 12px; background: transparent; color: var(--text-tertiary);
+            border: 1px solid var(--border); border-radius: 10px; font-size: 12px;
+            cursor: pointer; transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+            width: 100%; box-sizing: border-box;
           }
           .rs-sync-btn:active { background: var(--bg-tertiary); }
 
           .rs-toast {
-            position: fixed; bottom: 30px; left: 50%;
+            position: fixed; bottom: 24px; left: 50%;
             transform: translateX(-50%) translateY(100px);
             padding: 14px 24px; border-radius: 12px; font-size: 14px; font-weight: 500;
             z-index: 1000; transition: transform 0.3s ease; pointer-events: none;
-            max-width: 90vw; text-align: center;
+            max-width: 88vw; text-align: center;
           }
           .rs-toast.show { transform: translateX(-50%) translateY(0); }
           .rs-toast.success { background: #22c55e; color: #fff; }
           .rs-toast.error { background: #ef4444; color: #fff; }
 
-          .rs-recent { margin-top: 28px; padding-bottom: 40px; }
-          .rs-recent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-          .rs-recent-header h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
-          .rs-total-badge { font-size: 12px; color: var(--text-tertiary); font-family: 'JetBrains Mono', monospace; }
-          .rs-empty { text-align: center; color: var(--text-tertiary); padding: 30px 0; font-size: 13px; }
+          .rs-recent { margin-top: 24px; padding-bottom: 40px; }
+          .rs-recent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+          .rs-recent-header h3 { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+          .rs-total-badge { font-size: 11px; color: var(--text-tertiary); font-family: 'JetBrains Mono', monospace; }
+          .rs-empty { text-align: center; color: var(--text-tertiary); padding: 24px 0; font-size: 13px; }
 
           .rs-sale-row {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 0; border-bottom: 1px solid var(--border-subtle); gap: 8px;
+            padding: 10px 0; border-bottom: 1px solid var(--border-subtle); gap: 6px;
           }
-          .rs-sale-main { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-          .rs-sale-sku { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 500; color: var(--accent); }
-          .rs-sale-ch { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 6px; background: var(--bg-tertiary); border-radius: 4px; flex-shrink: 0; }
-          .rs-sale-details { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-          .rs-sale-price { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; }
-          .rs-sale-customer { font-size: 12px; color: var(--text-tertiary); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-          .rs-sale-date { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
-          .rs-sale-notes { font-size: 11px; color: var(--text-tertiary); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+          .rs-sale-main { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+          .rs-sale-sku { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: var(--accent); }
+          .rs-sale-ch { font-size: 9px; font-weight: 700; letter-spacing: 0.3px; padding: 2px 5px; background: var(--bg-tertiary); border-radius: 4px; flex-shrink: 0; }
+          .rs-sale-details { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+          .rs-sale-price { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
+          .rs-sale-customer { font-size: 11px; color: var(--text-tertiary); max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .rs-sale-date { font-size: 10px; color: var(--text-tertiary); white-space: nowrap; }
 
           .rs-pager-btn {
-            padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+            padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border);
             background: var(--bg-secondary); color: var(--text-secondary); font-size: 13px;
             cursor: pointer; -webkit-tap-highlight-color: transparent;
           }
@@ -1528,10 +1553,8 @@
           .rs-pager-btn:disabled { opacity: 0.3; cursor: default; }
 
           @media (max-width: 600px) {
-            .rs-page { padding: 0 2px; }
+            .rs-page { padding: 0 6px; }
             .rs-sale-customer { display: none; }
-            .rs-sale-notes { display: none; }
-            .rs-sale-details { gap: 8px; }
           }
         </style>
       `;
@@ -1619,6 +1642,12 @@
       }, 0);
     }
 
+    function rsPickChannel(btn) {
+      document.querySelectorAll('#rs-pills .rs-pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('rs-channel').value = btn.dataset.ch;
+    }
+
     function rsToast(msg, ok) {
       const t = document.getElementById("rs-toast");
       if (!t) return;
@@ -1687,8 +1716,19 @@
       }
     }
 
-    let _syncArmed = false;
+    let _syncTapCount = 0;
     let _syncTimer = null;
+
+    function _syncReset() {
+      _syncTapCount = 0;
+      clearTimeout(_syncTimer);
+      const btn = document.getElementById("rs-sync-btn");
+      if (btn) {
+        btn.textContent = "Sync to Shopify (set stock to 0)";
+        btn.style.borderColor = "";
+        btn.style.color = "";
+      }
+    }
 
     function rsSyncShopifyStep() {
       const btn = document.getElementById("rs-sync-btn");
@@ -1697,23 +1737,20 @@
       if (!sku && !noSku) { rsToast("Enter a SKU first", false); return; }
       if (noSku) { rsToast("Cannot sync without a SKU", false); return; }
 
-      if (!_syncArmed) {
-        // First tap: arm it
-        _syncArmed = true;
-        btn.textContent = "Tap again to confirm: set " + sku + " to 0";
+      _syncTapCount++;
+      clearTimeout(_syncTimer);
+      _syncTimer = setTimeout(_syncReset, 4000);
+
+      if (_syncTapCount === 1) {
+        btn.textContent = "Tap 2 more times to confirm";
+        btn.style.borderColor = "var(--warning, orange)";
+        btn.style.color = "var(--warning, orange)";
+      } else if (_syncTapCount === 2) {
+        btn.textContent = "Tap once more: set " + sku + " → 0";
         btn.style.borderColor = "var(--danger)";
         btn.style.color = "var(--danger)";
-        // Auto-disarm after 4 seconds
-        clearTimeout(_syncTimer);
-        _syncTimer = setTimeout(() => {
-          _syncArmed = false;
-          btn.textContent = "Sync to Shopify (set stock to 0)";
-          btn.style.borderColor = "";
-          btn.style.color = "";
-        }, 4000);
-      } else {
-        // Second tap: execute
-        _syncArmed = false;
+      } else if (_syncTapCount >= 3) {
+        _syncTapCount = 0;
         clearTimeout(_syncTimer);
         btn.textContent = "Syncing...";
         btn.style.borderColor = "";

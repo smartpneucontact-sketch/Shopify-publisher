@@ -1,0 +1,866 @@
+<\!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartPneu — Revenue Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #38bdf8;
+        }
+
+        header a {
+            color: #38bdf8;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 1px solid #38bdf8;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+
+        header a:hover {
+            background-color: #38bdf8;
+            color: #0f172a;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            transition: all 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: #38bdf8;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #e2e8f0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #38bdf8;
+        }
+
+        .chart-container {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+            margin-bottom: 1rem;
+        }
+
+        .channels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .channel-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .channel-name {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-transform: capitalize;
+        }
+
+        .channel-revenue {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .channel-stats {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        .channel-percentage {
+            margin-top: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .form-section {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 0.875rem;
+            color: #cbd5e1;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.375rem;
+            color: #e2e8f0;
+            padding: 0.75rem;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+            grid-column: 1 / -1;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            grid-column: 1 / -1;
+            margin-top: 1rem;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-primary {
+            background-color: #38bdf8;
+            color: #0f172a;
+        }
+
+        .btn-primary:hover {
+            background-color: #22d3ee;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(56, 189, 248, 0.2);
+        }
+
+        .btn-secondary {
+            background-color: #f59e0b;
+            color: #0f172a;
+        }
+
+        .btn-secondary:hover {
+            background-color: #fbbf24;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.2);
+        }
+
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+            font-size: 0.875rem;
+            padding: 0.5rem 1rem;
+        }
+
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+
+        .table-container {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background-color: #0f172a;
+            border-bottom: 2px solid #334155;
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #cbd5e1;
+            text-transform: uppercase;
+            font-size: 0.875rem;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        tbody tr:hover {
+            background-color: #334155;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .shopify { background-color: rgba(150, 191, 72, 0.2); color: #96bf48; }
+        .ebay { background-color: rgba(229, 50, 56, 0.2); color: #e53238; }
+        .ebay_kleinanzeigen { background-color: rgba(134, 184, 23, 0.2); color: #86b817; }
+        .leboncoin { background-color: rgba(255, 110, 20, 0.2); color: #ff6e14; }
+        .cash { background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #94a3b8;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #334155;
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+
+        .success {
+            background-color: rgba(34, 197, 94, 0.1);
+            border: 1px solid #22c55e;
+            color: #86efac;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+
+        .top-skus-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .sku-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+
+        .sku-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #e2e8f0;
+        }
+
+        .sku-code {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-bottom: 1rem;
+            font-family: 'Courier New', monospace;
+        }
+
+        .sku-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .sku-stat {
+            background-color: #0f172a;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            text-align: center;
+        }
+
+        .sku-stat-label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-bottom: 0.25rem;
+        }
+
+        .sku-stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .channels-grid {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 0.875rem;
+            }
+
+            th, td {
+                padding: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>SmartPneu — Revenue Dashboard</h1>
+            <a href="/dashboard">← Back to Dashboard</a>
+        </header>
+
+        <\!-- Messages -->
+        <div id="messages"></div>
+
+        <\!-- Top Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-label">Total Revenue</div>
+                <div class="stat-value" id="totalRevenue">€0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Sale Count</div>
+                <div class="stat-value" id="saleCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Average Sale</div>
+                <div class="stat-value" id="avgPrice">€0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Best Channel</div>
+                <div class="stat-value" id="bestChannel">—</div>
+            </div>
+        </div>
+
+        <\!-- Revenue Chart -->
+        <div class="section">
+            <h2 class="section-title">Revenue Trend (Last 30 Days)</h2>
+            <div class="chart-container">
+                <div class="chart-wrapper">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <\!-- Channel Breakdown -->
+        <div class="section">
+            <h2 class="section-title">Revenue by Channel</h2>
+            <div class="channels-grid" id="channelsGrid"></div>
+        </div>
+
+        <\!-- Record Sale Form -->
+        <div class="section">
+            <h2 class="section-title">Record a Sale</h2>
+            <div class="form-section">
+                <form id="saleForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="sku">SKU *</label>
+                            <input type="text" id="sku" name="sku" required placeholder="e.g., TIRE-2024-001">
+                        </div>
+                        <div class="form-group">
+                            <label for="channel">Channel *</label>
+                            <select id="channel" name="channel" required>
+                                <option value="">Select a channel</option>
+                                <option value="shopify">Shopify</option>
+                                <option value="ebay">eBay</option>
+                                <option value="ebay_kleinanzeigen">eBay Kleinanzeigen</option>
+                                <option value="leboncoin">Leboncoin</option>
+                                <option value="cash">Cash</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="salePrice">Sale Price (EUR) *</label>
+                            <input type="number" id="salePrice" name="salePrice" required min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="quantity">Quantity *</label>
+                            <input type="number" id="quantity" name="quantity" required min="1" value="1" placeholder="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="productTitle">Product Title</label>
+                            <input type="text" id="productTitle" name="productTitle" placeholder="e.g., Michelin Pilot Sport 4 225/45R17">
+                        </div>
+                        <div class="form-group">
+                            <label for="brand">Brand</label>
+                            <input type="text" id="brand" name="brand" placeholder="e.g., Michelin">
+                        </div>
+                        <div class="form-group">
+                            <label for="model">Model</label>
+                            <input type="text" id="model" name="model" placeholder="e.g., Pilot Sport 4">
+                        </div>
+                        <div class="form-group">
+                            <label for="customerName">Customer Name</label>
+                            <input type="text" id="customerName" name="customerName" placeholder="e.g., John Smith">
+                        </div>
+                        <div class="form-group">
+                            <label for="notes">Notes</label>
+                            <textarea id="notes" name="notes" placeholder="Optional notes..."></textarea>
+                        </div>
+                        <div class="button-group">
+                            <button type="submit" class="btn-primary">Record Sale</button>
+                            <button type="reset" class="btn-secondary">Clear Form</button>
+                            <button type="button" class="btn-secondary" id="importShopifyBtn">Import Shopify Orders</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <\!-- Top SKUs -->
+        <div class="section">
+            <h2 class="section-title">Top Selling SKUs</h2>
+            <div class="top-skus-grid" id="topSkusGrid"></div>
+        </div>
+
+        <\!-- Recent Sales -->
+        <div class="section">
+            <h2 class="section-title">Recent Sales</h2>
+            <div class="table-container">
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>SKU</th>
+                                <th>Product</th>
+                                <th>Channel</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                                <th>Customer</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentSalesBody">
+                            <tr>
+                                <td colspan="8" class="loading"><div class="spinner"></div></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = '/api';
+        const CHANNEL_COLORS = {
+            shopify: '#96bf48',
+            ebay: '#e53238',
+            ebay_kleinanzeigen: '#86b817',
+            leboncoin: '#ff6e14',
+            cash: '#f59e0b'
+        };
+
+        // Format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('de-DE', {
+                style: 'currency',
+                currency: 'EUR',
+                minimumFractionDigits: 2
+            }).format(amount);
+        }
+
+        // Format date
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return new Intl.DateTimeFormat('de-DE', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }).format(date);
+        }
+
+        // Show message
+        function showMessage(message, type = 'info') {
+            const container = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = type === 'error' ? 'error' : 'success';
+            div.textContent = message;
+            container.appendChild(div);
+            setTimeout(() => div.remove(), 5000);
+        }
+
+        // Fetch summary data
+        async function loadSummary() {
+            try {
+                const response = await fetch(`${API_BASE}/sales/summary`);
+                if (\!response.ok) throw new Error('Failed to load summary');
+                const data = await response.json();
+
+                // Update stats
+                document.getElementById('totalRevenue').textContent = formatCurrency(data.total_revenue);
+                document.getElementById('saleCount').textContent = data.sale_count;
+                document.getElementById('avgPrice').textContent = formatCurrency(
+                    data.sale_count > 0 ? data.total_revenue / data.sale_count : 0
+                );
+
+                // Best channel
+                if (data.by_channel.length > 0) {
+                    const best = data.by_channel.reduce((a, b) => a.total > b.total ? a : b);
+                    document.getElementById('bestChannel').textContent = best.channel.toUpperCase();
+                }
+
+                // Load chart data
+                loadRevenueChart(data.by_day);
+
+                // Load channels
+                loadChannels(data.by_channel, data.total_revenue);
+
+                // Load top SKUs
+                loadTopSkus(data.top_skus);
+
+                // Load recent sales
+                loadRecentSales();
+            } catch (error) {
+                console.error('Error loading summary:', error);
+                showMessage('Error loading dashboard data', 'error');
+            }
+        }
+
+        // Load revenue chart
+        function loadRevenueChart(dailyData) {
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+
+            const labels = dailyData.map(d => formatDate(d.date));
+            const data = dailyData.map(d => d.total);
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Daily Revenue (EUR)',
+                        data,
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#38bdf8',
+                        pointBorderColor: '#0f172a',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#cbd5e1', font: { size: 12 } }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#334155', drawBorder: false },
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: function(value) {
+                                    return '€' + value.toFixed(0);
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load channels
+        function loadChannels(channels, totalRevenue) {
+            const grid = document.getElementById('channelsGrid');
+            grid.innerHTML = channels.map(channel => {
+                const percentage = ((channel.total / totalRevenue) * 100).toFixed(1);
+                const color = CHANNEL_COLORS[channel.channel] || '#38bdf8';
+                return `
+                    <div class="channel-card" style="border-left: 4px solid ${color}">
+                        <div class="channel-name">${channel.channel}</div>
+                        <div class="channel-revenue">${formatCurrency(channel.total)}</div>
+                        <div class="channel-stats">${channel.count} sales</div>
+                        <div class="channel-percentage">${percentage}% of total</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Load top SKUs
+        function loadTopSkus(skus) {
+            const grid = document.getElementById('topSkusGrid');
+            grid.innerHTML = skus.slice(0, 10).map(sku => `
+                <div class="sku-card">
+                    <div class="sku-title">${sku.product_title || 'Unknown Product'}</div>
+                    <div class="sku-code">${sku.sku}</div>
+                    <div class="sku-stats">
+                        <div class="sku-stat">
+                            <div class="sku-stat-label">Revenue</div>
+                            <div class="sku-stat-value">${formatCurrency(sku.total)}</div>
+                        </div>
+                        <div class="sku-stat">
+                            <div class="sku-stat-label">Units Sold</div>
+                            <div class="sku-stat-value">${sku.count}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Load recent sales
+        async function loadRecentSales() {
+            try {
+                const response = await fetch(`${API_BASE}/sales/`);
+                if (\!response.ok) throw new Error('Failed to load sales');
+                const sales = await response.json();
+
+                const tbody = document.getElementById('recentSalesBody');
+                if (sales.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #94a3b8;">No sales recorded yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = sales.slice(0, 50).map(sale => `
+                    <tr>
+                        <td>${formatDate(sale.date)}</td>
+                        <td>${sale.sku}</td>
+                        <td>${sale.product_title || '—'}</td>
+                        <td><span class="status-badge ${sale.channel}">${sale.channel}</span></td>
+                        <td>${sale.quantity}</td>
+                        <td>${formatCurrency(sale.sale_price)}</td>
+                        <td>${sale.customer_name || '—'}</td>
+                        <td><button class="btn-danger" onclick="deleteSale('${sale.id}')">Delete</button></td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading sales:', error);
+                showMessage('Error loading recent sales', 'error');
+            }
+        }
+
+        // Delete sale
+        async function deleteSale(id) {
+            if (\!confirm('Are you sure you want to delete this sale?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/sales/${id}`, { method: 'DELETE' });
+                if (\!response.ok) throw new Error('Failed to delete sale');
+                showMessage('Sale deleted successfully', 'success');
+                loadSummary();
+            } catch (error) {
+                console.error('Error deleting sale:', error);
+                showMessage('Error deleting sale', 'error');
+            }
+        }
+
+        // Record sale form
+        document.getElementById('saleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                sku: document.getElementById('sku').value,
+                channel: document.getElementById('channel').value,
+                sale_price: parseFloat(document.getElementById('salePrice').value),
+                quantity: parseInt(document.getElementById('quantity').value),
+                product_title: document.getElementById('productTitle').value,
+                brand: document.getElementById('brand').value,
+                model: document.getElementById('model').value,
+                customer_name: document.getElementById('customerName').value,
+                notes: document.getElementById('notes').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/sales/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                if (\!response.ok) throw new Error('Failed to record sale');
+
+                showMessage('Sale recorded successfully', 'success');
+                document.getElementById('saleForm').reset();
+                loadSummary();
+            } catch (error) {
+                console.error('Error recording sale:', error);
+                showMessage('Error recording sale', 'error');
+            }
+        });
+
+        // Import Shopify
+        document.getElementById('importShopifyBtn').addEventListener('click', async () => {
+            if (\!confirm('Import Shopify orders? This may take a moment.')) return;
+
+            const btn = document.getElementById('importShopifyBtn');
+            btn.disabled = true;
+            btn.textContent = 'Importing...';
+
+            try {
+                const response = await fetch(`${API_BASE}/sales/import/shopify`, { method: 'POST' });
+                if (\!response.ok) throw new Error('Failed to import');
+
+                showMessage('Shopify orders imported successfully', 'success');
+                await new Promise(r => setTimeout(r, 1000));
+                loadSummary();
+            } catch (error) {
+                console.error('Error importing:', error);
+                showMessage('Error importing Shopify orders', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Import Shopify Orders';
+            }
+        });
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', loadSummary);
+
+        // Refresh data every 30 seconds
+        setInterval(loadSummary, 30000);
+    </script>
+</body>
+</html>

@@ -12,23 +12,30 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.routes import products, orders, customers, inventory, health, studio, ebay
+from app.routes import sales, events, gateway
+from app.services.sales_db import sales_db
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print(f"🚀 Starting Shopify App ({settings.ENVIRONMENT})")
+    print(f"🚀 Starting SmartPneu Central ({settings.ENVIRONMENT})")
     print(f"   Shop: {settings.SHOPIFY_STORE_DOMAIN}")
     print(f"   Dashboard: /dashboard")
+    print(f"   Sales: /sales")
+    print(f"   API Docs: /docs")
+    # Initialize sales database
+    await sales_db.init()
+    print(f"   ✅ Sales DB initialized")
     yield
     print("👋 Shutting down...")
 
 
 app = FastAPI(
-    title="Shopify Headless App",
-    description="Headless Shopify storefront powered by the Admin API",
-    version="1.0.0",
+    title="SmartPneu Central",
+    description="Central gateway for SmartPneu — Shopify, eBay, sales tracking, and service coordination",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -53,14 +60,18 @@ app.include_router(customers.router, prefix="/api/customers", tags=["Customers"]
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
 app.include_router(ebay.router, prefix="/api/ebay", tags=["eBay"])
+app.include_router(sales.router, prefix="/api/sales", tags=["Sales"])
+app.include_router(events.router, prefix="/api/events", tags=["Events"])
+app.include_router(gateway.router, prefix="/api/gateway", tags=["Gateway"])
 
 
 @app.get("/")
 async def root():
     return {
-        "app": "Shopify Headless App",
+        "app": "SmartPneu Central",
         "environment": settings.ENVIRONMENT,
         "dashboard": "/dashboard",
+        "sales": "/sales",
         "docs": "/docs",
     }
 
@@ -69,4 +80,11 @@ async def root():
 async def dashboard():
     """Serve the admin dashboard."""
     html_file = STATIC_DIR / "dashboard.html"
+    return HTMLResponse(content=html_file.read_text(), status_code=200)
+
+
+@app.get("/sales", response_class=HTMLResponse)
+async def sales_dashboard():
+    """Serve the revenue tracking dashboard."""
+    html_file = STATIC_DIR / "sales.html"
     return HTMLResponse(content=html_file.read_text(), status_code=200)

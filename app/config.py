@@ -25,6 +25,22 @@ class Settings(BaseSettings):
     # ── CORS ─────────────────────────────────────────────────────────
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
 
+    # ── Internal API Auth (service-to-service) ───────────────────────
+    INTERNAL_API_KEY: str = ""
+
+    # ── SmartPneu Database Service ───────────────────────────────────
+    DATABASE_SERVICE_URL: str = "http://smartpneu-database.railway.internal:5070"
+    DATABASE_API_KEY: str = ""
+
+    # ── Studio Service (Product_picture_queue) ───────────────────────
+    STUDIO_SERVICE_URL: str = "http://product-picture-queue.railway.internal:5000"
+
+    # ── Product Manager Service ──────────────────────────────────────
+    PRODUCT_MANAGER_SERVICE_URL: str = "http://smartpneu-product-manager.railway.internal:5000"
+
+    # ── Sales Database ───────────────────────────────────────────────
+    SALES_DB_PATH: str = "data/sales.db"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -1046,15 +1046,41 @@ async def ebay_refresh_listing_status():
 
 @router.get("/debug/active-skus")
 async def debug_active_skus():
-    """Debug endpoint: show what eBay returns as active SKUs."""
+    """Debug: compare eBay inventory SKUs vs Shopify publisher SKUs."""
+    from app.services.shopify import shopify_client
+
     try:
-        active_from_inventory = await ebay_client.get_all_active_skus_by_inventory()
+        ebay_skus = await ebay_client.get_all_active_skus_by_inventory()
     except Exception as e:
-        active_from_inventory = {"error": str(e)}
+        return {"error": str(e)}
+
+    products = await shopify_client.get_products_with_metafields()
+
+    # Get SKUs that were pushed to eBay (have listing_id metafield)
+    publisher_skus = set()
+    for p in products:
+        has_listing = any(
+            mf["namespace"] == "ebay" and mf["key"] == "listing_id"
+            for mf in p.get("metafields", [])
+        )
+        if has_listing:
+            sku = next((v["sku"] for v in p.get("variants", []) if v.get("sku")), None)
+            if sku:
+                publisher_skus.add(sku)
+
+    # Find mismatches
+    in_ebay_not_publisher = ebay_skus - publisher_skus
+    in_publisher_not_ebay = publisher_skus - ebay_skus  # These get marked ENDED
+    in_both = publisher_skus & ebay_skus  # These get marked ACTIVE
 
     return {
-        "from_inventory": sorted(list(active_from_inventory)) if isinstance(active_from_inventory, set) else active_from_inventory,
-        "from_inventory_count": len(active_from_inventory) if isinstance(active_from_inventory, set) else 0,
+        "ebay_inventory_count": len(ebay_skus),
+        "publisher_listed_count": len(publisher_skus),
+        "matched_active": len(in_both),
+        "marked_ended": sorted(list(in_publisher_not_ebay)),
+        "marked_ended_count": len(in_publisher_not_ebay),
+        "in_ebay_only": sorted(list(in_ebay_not_publisher)),
+        "in_ebay_only_count": len(in_ebay_not_publisher),
     }
 
 

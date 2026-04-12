@@ -992,29 +992,58 @@ async def ebay_refresh_listing_status():
         if not offer_id or not has_listing:
             continue
 
+        sku = next((v["sku"] for v in p.get("variants", []) if v.get("sku")), None)
+
         try:
             detail = await ebay_client.get_offer_details(offer_id)
-            if detail.get("status") != "error":
+            if detail.get("status") == "error":
+                # Offer no longer exists → ENDED
+                simple_status = "ENDED"
+                offer_status = "ERROR"
+                listing_status = ""
+                available_qty = 0
+            else:
                 offer_status = detail.get("status", "UNKNOWN")
                 listing_status = detail.get("listing", {}).get("listingStatus", "")
-                # Map to simple status: ACTIVE, ENDED, ERROR
+                available_qty = detail.get("availableQuantity", None)
+
+                # Map to simple status: ACTIVE, ENDED
                 simple_status = "ACTIVE" if offer_status == "PUBLISHED" else offer_status
-                if listing_status in ("ENDED", "COMPLETED"):
+                if listing_status in ("ENDED", "COMPLETED", "SOLD"):
+                    simple_status = "ENDED"
+                # Key fix: if offer is published but quantity is 0, item is sold
+                if available_qty is not None and available_qty <= 0:
                     simple_status = "ENDED"
 
-                await shopify_client.set_product_metafield(
-                    p["id"], "ebay", "ebay_status", simple_status
-                )
-                sku = next((v["sku"] for v in p.get("variants", []) if v.get("sku")), None)
-                updated.append({
-                    "product_id": p["id"],
-                    "sku": sku,
-                    "offer_status": offer_status,
-                    "listing_status": listing_status,
-                    "ebay_status": simple_status,
-                })
+            # Also check via inventory item if we have the SKU
+            if simple_status != "ENDED" and sku:
+                try:
+                    inv_item = await ebay_client.get_item(sku)
+                    if inv_item.get("status") == "error":
+                        simple_status = "ENDED"
+                    else:
+                        ship_avail = inv_item.get("availability", {}).get(
+                            "shipToLocationAvailability", {}
+                        )
+                        inv_qty = ship_avail.get("quantity", None)
+                        if inv_qty is not None and inv_qty <= 0:
+                            simple_status = "ENDED"
+                except Exception:
+                    pass  # Don't fail the whole refresh for this
+
+            await shopify_client.set_product_metafield(
+                p["id"], "ebay", "ebay_status", simple_status
+            )
+            updated.append({
+                "product_id": p["id"],
+                "sku": sku,
+                "offer_status": offer_status,
+                "listing_status": listing_status,
+                "available_qty": available_qty,
+                "ebay_status": simple_status,
+            })
         except Exception as e:
-            updated.append({"product_id": p["id"], "error": str(e)})
+            updated.append({"product_id": p["id"], "sku": sku, "error": str(e)})
 
     return {"updated": len(updated), "results": updated}
 
@@ -1059,14 +1088,33 @@ async def ebay_sync_inventory():
         try:
             detail = await ebay_client.get_offer_details(offer_id)
             if detail.get("status") == "error":
-                # Offer no longer exists on eBay → treat as ENDED
                 new_status = "ENDED"
             else:
                 offer_status = detail.get("status", "UNKNOWN")
                 listing_status = detail.get("listing", {}).get("listingStatus", "")
+                available_qty = detail.get("availableQuantity", None)
                 new_status = "ACTIVE" if offer_status == "PUBLISHED" else offer_status
                 if listing_status in ("ENDED", "COMPLETED", "SOLD"):
                     new_status = "ENDED"
+                # If quantity is 0, the item was sold
+                if available_qty is not None and available_qty <= 0:
+                    new_status = "ENDED"
+
+            # Also check inventory item quantity
+            if new_status != "ENDED" and sku:
+                try:
+                    inv_item = await ebay_client.get_item(sku)
+                    if inv_item.get("status") == "error":
+                        new_status = "ENDED"
+                    else:
+                        ship_avail = inv_item.get("availability", {}).get(
+                            "shipToLocationAvailability", {}
+                        )
+                        inv_qty = ship_avail.get("quantity", None)
+                        if inv_qty is not None and inv_qty <= 0:
+                            new_status = "ENDED"
+                except Exception:
+                    pass
 
             # Update metafield
             await shopify_client.set_product_metafield(

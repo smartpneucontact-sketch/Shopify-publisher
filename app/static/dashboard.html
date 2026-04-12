@@ -357,6 +357,7 @@
     const PAGES = [
       { id: "tires", label: "Tires", icon: "tire" },
       { id: "ebay", label: "eBay", icon: "ebay" },
+      { id: "record-sale", label: "Record Sale", icon: "banknote" },
       { id: "orders", label: "Orders", icon: "shopping-bag" },
       { id: "customers", label: "Customers", icon: "users" },
       { id: "inventory", label: "Inventory", icon: "box" },
@@ -374,6 +375,7 @@
       "check": `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
       "alert": `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
       "ebay": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 8l3 3-3 3"/><line x1="13" y1="13" x2="17" y2="13"/></svg>`,
+      "banknote": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 6v12"/><path d="M18 6v12"/></svg>`,
     };
 
     // ── API ─────────────────────────────────────────────────────────
@@ -567,6 +569,7 @@
       switch (state.page) {
         case "tires": return renderTires(el);
         case "ebay": return renderEbay(el);
+        case "record-sale": return renderRecordSale(el);
         case "orders": return renderOrders(el);
         case "customers": return renderCustomers(el);
         case "inventory": return renderInventory(el);
@@ -1331,85 +1334,13 @@
     async function renderOrders(el) {
       el.innerHTML = `<div class="stats-grid">${statCard("Loading...", null, true)}</div><div class="table-container"><table><tbody><tr><td colspan="6" class="loading-cell"><span class="pulse">Loading orders...</span></td></tr></tbody></table></div>`;
       try {
-        const [oRes, cRes, salesRes] = await Promise.all([
-          apiFetch("/api/orders?limit=50&status=any"),
-          apiFetch("/api/orders/count"),
-          apiFetch("/api/sales/?limit=20").catch(() => [])
-        ]);
+        const [oRes, cRes] = await Promise.all([apiFetch("/api/orders?limit=50&status=any"), apiFetch("/api/orders/count")]);
         const orders = oRes.orders || []; const count = cRes.count ?? 0;
         const paid = orders.filter(o => o.financial_status === "paid").length;
         const revenue = orders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0);
-        const recentSales = Array.isArray(salesRes) ? salesRes : [];
-
         el.innerHTML = `
           <div class="stats-grid fade-in">${statCard("Total Orders", count, true)}${statCard("Paid", paid)}${statCard("Revenue", money(revenue))}${statCard("Avg. Order", orders.length ? money(revenue / orders.length) : "—")}</div>
-
-          <!-- Record Sale -->
-          <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:20px" class="fade-in">
-            <div style="background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:10px;padding:20px">
-              <h3 style="margin:0 0 14px 0;font-size:14px;font-weight:600">Record a Sale</h3>
-              <form id="record-sale-form" onsubmit="recordInPersonSale(event)" style="display:flex;flex-direction:column;gap:10px">
-                <input type="text" id="rs-sku" placeholder="SKU" required
-                  style="padding:9px 12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:13px">
-                <div style="display:flex;gap:8px">
-                  <input type="number" id="rs-price" placeholder="Price (EUR)" required step="0.01" min="0"
-                    style="flex:1;padding:9px 12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:13px">
-                  <select id="rs-channel"
-                    style="width:130px;padding:9px 8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:12px">
-                    <option value="cash">Cash</option>
-                    <option value="ebay">eBay</option>
-                    <option value="leboncoin">Leboncoin</option>
-                    <option value="ebay_kleinanzeigen">Kleinanzeigen</option>
-                    <option value="shopify">Shopify</option>
-                  </select>
-                </div>
-                <input type="text" id="rs-customer" placeholder="Customer name (optional)"
-                  style="padding:9px 12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:13px">
-                <input type="text" id="rs-notes" placeholder="Notes (optional)"
-                  style="padding:9px 12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:13px">
-                <div style="display:flex;gap:8px">
-                  <button type="submit" class="btn btn-accent" style="flex:1;font-size:12px">
-                    Record Sale
-                  </button>
-                  <button type="button" class="btn" style="font-size:12px" onclick="syncSkuToShopify()">
-                    Sync Shopify
-                  </button>
-                </div>
-              </form>
-              <div id="rs-message" style="margin-top:10px;font-size:12px;display:none;padding:8px 10px;border-radius:6px"></div>
-            </div>
-
-            <div style="background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:10px;padding:20px">
-              <h3 style="margin:0 0 14px 0;font-size:14px;font-weight:600">Recent Sales</h3>
-              <div id="recent-sales-list" style="max-height:320px;overflow-y:auto">
-                ${recentSales.length === 0
-                  ? '<div style="text-align:center;color:var(--text-tertiary);padding:20px;font-size:13px">No sales recorded yet</div>'
-                  : `<table style="width:100%;font-size:12px;border-collapse:collapse">
-                      <thead><tr style="border-bottom:1px solid var(--border)">
-                        <th style="text-align:left;padding:6px 8px;color:var(--text-tertiary);font-weight:500">SKU</th>
-                        <th style="text-align:left;padding:6px 8px;color:var(--text-tertiary);font-weight:500">Channel</th>
-                        <th style="text-align:right;padding:6px 8px;color:var(--text-tertiary);font-weight:500">Price</th>
-                        <th style="text-align:left;padding:6px 8px;color:var(--text-tertiary);font-weight:500">Customer</th>
-                        <th style="text-align:right;padding:6px 8px;color:var(--text-tertiary);font-weight:500">Date</th>
-                      </tr></thead>
-                      <tbody>${recentSales.map(s => {
-                        const ch = s.channel || "—";
-                        const chColor = ch === "cash" ? "#22c55e" : ch === "ebay" ? "#e53238" : ch === "leboncoin" ? "#ff6e14" : "var(--accent)";
-                        return `<tr style="border-bottom:1px solid var(--border)">
-                          <td style="padding:7px 8px;font-family:'JetBrains Mono',monospace;color:var(--accent)">${s.sku}</td>
-                          <td style="padding:7px 8px"><span style="color:${chColor};font-weight:500;font-size:11px;text-transform:uppercase">${ch}</span></td>
-                          <td style="padding:7px 8px;text-align:right;font-family:'JetBrains Mono',monospace">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</td>
-                          <td style="padding:7px 8px;color:var(--text-secondary)">${s.customer_name || '—'}</td>
-                          <td style="padding:7px 8px;text-align:right;color:var(--text-tertiary);font-size:11px">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>
-                        </tr>`;
-                      }).join("")}</tbody>
-                    </table>`
-                }
-              </div>
-            </div>
-          </div>
-
-          <div class="table-container fade-in"><div class="table-header"><h3>Shopify Orders</h3></div>
+          <div class="table-container fade-in"><div class="table-header"><h3>Recent Orders</h3></div>
           <table><thead><tr><th>Order</th><th>SKUs</th><th>Customer</th><th>Fulfillment</th><th>Payment</th><th>Total</th><th>Date</th></tr></thead>
           <tbody>${orders.length === 0 ? '<tr><td colspan="7" class="loading-cell">No orders</td></tr>' :
             orders.map(o => {
@@ -1420,52 +1351,246 @@
       } catch (e) { el.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
     }
 
-    // ── Record Sale (in-person / any channel) ───────────────────────
-    async function recordInPersonSale(event) {
+    // ── Record Sale (dedicated mobile-friendly page) ────────────────
+    async function renderRecordSale(el) {
+      el.innerHTML = `<div style="display:flex;justify-content:center;padding:20px"><span class="pulse" style="color:var(--text-tertiary)">Loading...</span></div>`;
+      let recentSales = [];
+      try { const r = await apiFetch("/api/sales/?limit=30"); recentSales = Array.isArray(r) ? r : []; } catch(e) {}
+
+      // Today's stats
+      const today = new Date().toISOString().slice(0, 10);
+      const todaySales = recentSales.filter(s => s.sold_at && s.sold_at.startsWith(today));
+      const todayRevenue = todaySales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
+
+      function chColor(ch) {
+        return ch === "cash" ? "#22c55e" : ch === "ebay" ? "#e53238" : ch === "leboncoin" ? "#ff6e14" : ch === "ebay_kleinanzeigen" ? "#86b817" : "var(--accent)";
+      }
+      function chLabel(ch) {
+        return ch === "ebay_kleinanzeigen" ? "KA" : (ch || "—").toUpperCase();
+      }
+
+      el.innerHTML = `
+        <div class="rs-page fade-in">
+          <!-- Today summary -->
+          <div class="rs-today">
+            <div class="rs-today-count">${todaySales.length}</div>
+            <div class="rs-today-label">sale${todaySales.length !== 1 ? 's' : ''} today</div>
+            <div class="rs-today-revenue">${todayRevenue.toFixed(2)} EUR</div>
+          </div>
+
+          <!-- Form -->
+          <form id="rs-form" onsubmit="rsSubmit(event)" class="rs-form" autocomplete="off">
+            <div class="rs-field">
+              <label for="rs-sku">SKU</label>
+              <input type="text" id="rs-sku" inputmode="numeric" placeholder="e.g. 1234" required autofocus>
+            </div>
+            <div class="rs-row">
+              <div class="rs-field" style="flex:1">
+                <label for="rs-price">Price (EUR)</label>
+                <input type="number" id="rs-price" inputmode="decimal" placeholder="0.00" required step="0.01" min="0">
+              </div>
+              <div class="rs-field" style="flex:1">
+                <label for="rs-channel">Channel</label>
+                <select id="rs-channel">
+                  <option value="cash">Cash</option>
+                  <option value="ebay">eBay</option>
+                  <option value="leboncoin">Leboncoin</option>
+                  <option value="ebay_kleinanzeigen">Kleinanzeigen</option>
+                  <option value="shopify">Shopify</option>
+                </select>
+              </div>
+            </div>
+            <div class="rs-field">
+              <label for="rs-customer">Customer (optional)</label>
+              <input type="text" id="rs-customer" placeholder="Name">
+            </div>
+            <div class="rs-field">
+              <label for="rs-notes">Notes (optional)</label>
+              <input type="text" id="rs-notes" placeholder="Any notes">
+            </div>
+            <button type="submit" class="rs-submit" id="rs-submit-btn">Record Sale</button>
+            <button type="button" class="rs-sync-btn" onclick="rsSyncShopify()">Sync to Shopify (set stock to 0)</button>
+          </form>
+
+          <div id="rs-toast" class="rs-toast"></div>
+
+          <!-- Recent sales list -->
+          <div class="rs-recent">
+            <h3>Recent Sales</h3>
+            <div id="rs-list">
+              ${recentSales.length === 0
+                ? '<div class="rs-empty">No sales recorded yet</div>'
+                : recentSales.map(s => `
+                  <div class="rs-sale-row">
+                    <div class="rs-sale-main">
+                      <span class="rs-sale-sku">${s.sku}</span>
+                      <span class="rs-sale-ch" style="color:${chColor(s.channel)}">${chLabel(s.channel)}</span>
+                    </div>
+                    <div class="rs-sale-details">
+                      <span class="rs-sale-price">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</span>
+                      <span class="rs-sale-customer">${s.customer_name || ''}</span>
+                      <span class="rs-sale-date">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</span>
+                    </div>
+                  </div>
+                `).join("")
+              }
+            </div>
+          </div>
+        </div>
+
+        <style>
+          .rs-page { max-width: 520px; margin: 0 auto; padding: 0 4px; }
+
+          .rs-today { text-align: center; padding: 20px 0 24px; }
+          .rs-today-count { font-size: 48px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--accent); line-height: 1; }
+          .rs-today-label { font-size: 14px; color: var(--text-tertiary); margin-top: 4px; }
+          .rs-today-revenue { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+
+          .rs-form { display: flex; flex-direction: column; gap: 14px; }
+          .rs-row { display: flex; gap: 10px; }
+          .rs-field { display: flex; flex-direction: column; gap: 5px; }
+          .rs-field label { font-size: 12px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+          .rs-field input, .rs-field select {
+            padding: 14px 14px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            -webkit-appearance: none;
+            transition: border-color 0.15s;
+          }
+          .rs-field input:focus, .rs-field select:focus { outline: none; border-color: var(--accent); }
+          .rs-field select { font-family: 'DM Sans', sans-serif; font-size: 14px; }
+
+          .rs-submit {
+            padding: 16px;
+            background: var(--accent);
+            color: #0a0a0b;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            margin-top: 4px;
+            -webkit-tap-highlight-color: transparent;
+          }
+          .rs-submit:active { opacity: 0.8; }
+          .rs-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+          .rs-sync-btn {
+            padding: 12px;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+          }
+          .rs-sync-btn:active { background: var(--bg-tertiary); }
+
+          .rs-toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            pointer-events: none;
+            max-width: 90vw;
+            text-align: center;
+          }
+          .rs-toast.show { transform: translateX(-50%) translateY(0); }
+          .rs-toast.success { background: #22c55e; color: #fff; }
+          .rs-toast.error { background: #ef4444; color: #fff; }
+
+          .rs-recent { margin-top: 28px; }
+          .rs-recent h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
+          .rs-empty { text-align: center; color: var(--text-tertiary); padding: 30px 0; font-size: 13px; }
+
+          .rs-sale-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-subtle);
+            gap: 10px;
+          }
+          .rs-sale-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+          .rs-sale-sku { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 500; color: var(--accent); }
+          .rs-sale-ch { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 6px; background: var(--bg-tertiary); border-radius: 4px; }
+          .rs-sale-details { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+          .rs-sale-price { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; }
+          .rs-sale-customer { font-size: 12px; color: var(--text-tertiary); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .rs-sale-date { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
+
+          @media (max-width: 600px) {
+            .rs-page { padding: 0 2px; }
+            .rs-sale-customer { display: none; }
+            .rs-sale-details { gap: 8px; }
+          }
+        </style>
+      `;
+    }
+
+    function rsToast(msg, ok) {
+      const t = document.getElementById("rs-toast");
+      t.textContent = msg;
+      t.className = "rs-toast " + (ok ? "success" : "error") + " show";
+      setTimeout(() => { t.classList.remove("show"); }, 3000);
+    }
+
+    async function rsSubmit(event) {
       event.preventDefault();
       const sku = document.getElementById("rs-sku").value.trim();
       const price = parseFloat(document.getElementById("rs-price").value);
       const channel = document.getElementById("rs-channel").value;
       const customer = document.getElementById("rs-customer").value.trim();
       const notes = document.getElementById("rs-notes").value.trim();
-      const msgEl = document.getElementById("rs-message");
+      const btn = document.getElementById("rs-submit-btn");
 
-      if (!sku || !price) { showMsg(msgEl, "SKU and price required", false); return; }
+      if (!sku || !price) { rsToast("SKU and price required", false); return; }
 
+      btn.disabled = true;
+      btn.textContent = "Saving...";
       try {
-        const result = await apiPost("/api/sales/", {
+        await apiPost("/api/sales/", {
           sku, channel, sale_price: price, quantity: 1,
           customer_name: customer || null,
           notes: notes || "Recorded from dashboard"
         });
-        showMsg(msgEl, `Sale recorded: SKU ${sku} — ${price.toFixed(2)} EUR (${channel})`, true);
-        document.getElementById("record-sale-form").reset();
-        // Refresh orders page to show updated recent sales
-        setTimeout(() => renderOrders(document.getElementById("content")), 1500);
+        rsToast("Sale recorded: " + sku + " — " + price.toFixed(2) + " EUR", true);
+        document.getElementById("rs-form").reset();
+        // Focus SKU field for quick next entry
+        document.getElementById("rs-sku").focus();
+        // Refresh page to update list and today count
+        setTimeout(() => renderRecordSale(document.getElementById("content")), 1200);
       } catch (e) {
-        showMsg(msgEl, "Error: " + e.message, false);
+        rsToast("Error: " + e.message, false);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Record Sale";
       }
     }
 
-    async function syncSkuToShopify() {
+    async function rsSyncShopify() {
       const sku = document.getElementById("rs-sku").value.trim();
-      if (!sku) { alert("Enter a SKU first to sync its inventory to 0 on Shopify"); return; }
-      if (!confirm(`Set Shopify inventory to 0 for SKU ${sku}?`)) return;
-
+      if (!sku) { rsToast("Enter a SKU first", false); return; }
+      if (!confirm("Set Shopify inventory to 0 for SKU " + sku + "?")) return;
       try {
-        const result = await apiPost("/api/sales/sync-shopify", { sku });
-        alert(`SKU ${sku}: Shopify inventory set to 0`);
+        await apiPost("/api/sales/sync-shopify", { sku });
+        rsToast("Shopify stock zeroed for " + sku, true);
       } catch (e) {
-        alert("Error: " + e.message);
+        rsToast("Error: " + e.message, false);
       }
-    }
-
-    function showMsg(el, text, success) {
-      el.style.display = "block";
-      el.style.color = success ? "var(--success)" : "#f87171";
-      el.style.background = success ? "rgba(34,197,94,0.1)" : "rgba(248,113,113,0.1)";
-      el.textContent = (success ? "OK — " : "") + text;
-      if (success) setTimeout(() => { el.style.display = "none"; }, 5000);
     }
 
     async function renderCustomers(el) {

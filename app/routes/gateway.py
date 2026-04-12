@@ -12,7 +12,7 @@ except ImportError:
     settings = None
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/gateway", tags=["gateway"])
+router = APIRouter(tags=["gateway"])
 
 class ImageUrlRequest(BaseModel):
     """Request body for attaching images to a product."""

@@ -1375,7 +1375,7 @@
       el.innerHTML = `<div style="display:flex;justify-content:center;padding:20px"><span class="pulse" style="color:var(--text-tertiary)">Loading...</span></div>`;
       rsPageOffset = 0;
       let allSales = [];
-      try { const r = await apiFetch("/api/sales?limit=500"); allSales = Array.isArray(r) ? r : []; } catch(e) {}
+      try { const r = await apiFetch("/api/sales/?limit=500"); allSales = Array.isArray(r) ? r : []; } catch(e) {}
 
       const today = new Date().toISOString().slice(0, 10);
       const todaySales = allSales.filter(s => s.sold_at && s.sold_at.startsWith(today));
@@ -1643,7 +1643,7 @@
       btn.disabled = true;
       btn.textContent = "Saving...";
       try {
-        await apiPost("/api/sales", {
+        await apiPost("/api/sales/", {
           sku, channel, sale_price: price, quantity: 1,
           customer_name: customer || null,
           notes: notes || (noSku ? "No SKU sale" : "Recorded from dashboard")
@@ -1658,7 +1658,7 @@
         // Refresh the sales list without full page re-render
         setTimeout(async () => {
           try {
-            const r = await apiFetch("/api/sales?limit=500");
+            const r = await apiFetch("/api/sales/?limit=500");
             const allSales = Array.isArray(r) ? r : [];
             window._rsSalesData = allSales;
             // Update today stats

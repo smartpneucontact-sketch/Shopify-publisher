@@ -18,7 +18,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 logger = logging.getLogger(__name__)
 
 # Create router
-router = APIRouter(prefix="/events", tags=["events"])
+router = APIRouter(tags=["events"])
 
 # ============================================================================
 # Data Models

@@ -100,9 +100,11 @@ async def record_sale(sale: SaleRequest):
     try:
         sale_data = sale.dict()
 
-        # Use current UTC time if sold_at not provided
+        # Use current UTC time if sold_at not provided, always as ISO string
         if sale_data.get("sold_at") is None:
-            sale_data["sold_at"] = datetime.utcnow()
+            sale_data["sold_at"] = datetime.utcnow().isoformat()
+        elif isinstance(sale_data["sold_at"], datetime):
+            sale_data["sold_at"] = sale_data["sold_at"].isoformat()
 
         # Convert enum to string
         sale_data["channel"] = sale_data["channel"].value

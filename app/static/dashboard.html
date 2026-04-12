@@ -1640,8 +1640,30 @@
         document.getElementById("rs-sku-field").style.opacity = "1";
         document.getElementById("rs-sku").disabled = false;
         document.getElementById("rs-sku").required = true;
-        document.getElementById("rs-sku").focus();
-        setTimeout(() => renderRecordSale(document.getElementById("content")), 1200);
+        // Refresh the sales list without full page re-render
+        setTimeout(async () => {
+          try {
+            const r = await apiFetch("/api/sales/?limit=500");
+            const allSales = Array.isArray(r) ? r : [];
+            window._rsSalesData = allSales;
+            // Update today stats
+            const today = new Date().toISOString().slice(0, 10);
+            const todaySales = allSales.filter(s => s.sold_at && s.sold_at.startsWith(today));
+            const todayRevenue = todaySales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
+            const totalRevenue = allSales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
+            const countEl = document.querySelector(".rs-today-count");
+            const labelEl = document.querySelector(".rs-today-label");
+            const revEl = document.querySelector(".rs-today-revenue");
+            const badgeEl = document.querySelector(".rs-total-badge");
+            if (countEl) countEl.textContent = todaySales.length;
+            if (labelEl) labelEl.textContent = "sale" + (todaySales.length !== 1 ? "s" : "") + " today";
+            if (revEl) revEl.textContent = todayRevenue.toFixed(2) + " EUR";
+            if (badgeEl) badgeEl.textContent = allSales.length + " sales \u00b7 " + totalRevenue.toFixed(2) + " EUR";
+            rsPageOffset = 0;
+            rsRenderSalesList();
+          } catch(e) { console.error("Failed to refresh sales list:", e); }
+          document.getElementById("rs-sku").focus();
+        }, 800);
       } catch (e) {
         rsToast("Error: " + e.message, false);
       } finally {

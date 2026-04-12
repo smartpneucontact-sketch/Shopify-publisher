@@ -1017,3 +1017,134 @@ async def ebay_refresh_listing_status():
             updated.append({"product_id": p["id"], "error": str(e)})
 
     return {"updated": len(updated), "results": updated}
+
+
+@router.post("/sync")
+async def ebay_sync_inventory():
+    """
+    Full sync: refresh eBay listing status → detect ENDED/SOLD items →
+    set Shopify inventory to 0 → import eBay orders as sales.
+
+    This is the "master sync" button that keeps everything in sync:
+    - eBay listings that ended (sold) → Shopify stock goes to 0
+    - eBay orders → recorded in sales database
+    - Metafields updated with current status
+    """
+    from app.services.shopify import shopify_client
+    from app.services.sales_db import sales_db
+
+    products = await shopify_client.get_products_with_metafields()
+    synced = []
+    ended_products = []
+    errors = []
+
+    # Step 1: Check every product that has eBay metafields
+    for p in products:
+        offer_id = None
+        listing_id = None
+        old_status = None
+        for mf in p.get("metafields", []):
+            if mf["namespace"] == "ebay" and mf["key"] == "offer_id":
+                offer_id = mf["value"]
+            if mf["namespace"] == "ebay" and mf["key"] == "listing_id":
+                listing_id = mf["value"]
+            if mf["namespace"] == "ebay" and mf["key"] == "ebay_status":
+                old_status = mf["value"]
+
+        if not offer_id or not listing_id:
+            continue
+
+        sku = next((v["sku"] for v in p.get("variants", []) if v.get("sku")), None)
+
+        try:
+            detail = await ebay_client.get_offer_details(offer_id)
+            if detail.get("status") == "error":
+                # Offer no longer exists on eBay → treat as ENDED
+                new_status = "ENDED"
+            else:
+                offer_status = detail.get("status", "UNKNOWN")
+                listing_status = detail.get("listing", {}).get("listingStatus", "")
+                new_status = "ACTIVE" if offer_status == "PUBLISHED" else offer_status
+                if listing_status in ("ENDED", "COMPLETED", "SOLD"):
+                    new_status = "ENDED"
+
+            # Update metafield
+            await shopify_client.set_product_metafield(
+                p["id"], "ebay", "ebay_status", new_status
+            )
+
+            entry = {
+                "product_id": p["id"],
+                "sku": sku,
+                "old_status": old_status,
+                "new_status": new_status,
+            }
+
+            # Step 2: If listing ended and was previously active, zero Shopify inventory
+            if new_status == "ENDED" and old_status != "ENDED":
+                try:
+                    zero_result = await shopify_client.set_inventory_to_zero(p["id"])
+                    entry["shopify_inventory"] = "zeroed"
+                    entry["zero_details"] = zero_result
+                    ended_products.append(entry)
+                except Exception as e:
+                    entry["shopify_inventory"] = f"error: {str(e)}"
+                    errors.append({"product_id": p["id"], "sku": sku, "error": str(e)})
+
+            synced.append(entry)
+
+        except Exception as e:
+            errors.append({"product_id": p["id"], "sku": sku, "error": str(e)})
+
+    # Step 3: Import eBay orders as sales
+    import_result = {"imported_count": 0, "skipped_count": 0}
+    try:
+        if ebay_client.tokens.is_authenticated:
+            orders = await ebay_client.get_all_recent_orders(days=90)
+            existing_sales = sales_db.get_sales(
+                channel="ebay", start_date=None, end_date=None,
+                sku=None, limit=10000, offset=0,
+            )
+            existing_refs = {s.get("order_ref") for s in existing_sales if s.get("order_ref")}
+
+            for order in orders:
+                order_id = order.get("orderId", "")
+                buyer = order.get("buyer", {})
+                buyer_name = buyer.get("username", "")
+                creation_date = order.get("creationDate")
+
+                for item in order.get("lineItems", []):
+                    item_sku = item.get("sku") or item.get("legacyItemId", "EBAY-NOSKU")
+                    line_ref = f"{order_id}:{item.get('lineItemId', item_sku)}"
+
+                    if line_ref in existing_refs:
+                        import_result["skipped_count"] += 1
+                        continue
+
+                    item_price = float(item.get("total", item.get("lineItemCost", {})).get("value", 0))
+                    sale_data = {
+                        "sku": item_sku,
+                        "channel": "ebay",
+                        "sale_price": item_price,
+                        "quantity": item.get("quantity", 1),
+                        "order_ref": line_ref,
+                        "customer_name": buyer_name,
+                        "notes": f"eBay order {order_id} (auto-sync)",
+                        "sold_at": creation_date,
+                        "product_title": item.get("title", ""),
+                    }
+                    result = sales_db.record_sale(sale_data)
+                    if result:
+                        import_result["imported_count"] += 1
+                        existing_refs.add(line_ref)
+    except Exception as e:
+        import_result["error"] = str(e)
+
+    return {
+        "total_checked": len(synced),
+        "ended_and_zeroed": len(ended_products),
+        "ended_products": ended_products,
+        "sales_import": import_result,
+        "errors": errors,
+        "synced": synced,
+    }

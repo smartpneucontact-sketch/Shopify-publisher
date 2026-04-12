@@ -1036,8 +1036,18 @@
                   <button class="btn" style="width:100%;font-size:11px" onclick="ebayRefreshStatus()">
                     🔄 Refresh Listing Status
                   </button>
+                  <button class="btn" style="width:100%;font-size:11px;margin-top:8px;background:#e53238;border-color:#e53238" onclick="ebaySyncInventory()">
+                    🔄 Sync eBay → Shopify
+                  </button>
                 `;
               })()}
+            </div>
+
+            <!-- Sync Results -->
+            <div class="ebay-card" id="syncResultsCard" style="display:none">
+              <h3>🔄 Last Sync Results</h3>
+              <div id="syncResults" style="font-size:12px;color:var(--text-secondary)">
+              </div>
             </div>
 
             <!-- Publish Log -->
@@ -1272,6 +1282,40 @@
         alert("Refresh error: " + e.message);
         btn.disabled = false;
         btn.textContent = "🔄 Refresh Listing Status";
+      }
+    }
+
+    async function ebaySyncInventory() {
+      const btn = event.target;
+      if (!confirm("Sync eBay with Shopify?\n\nThis will:\n• Refresh all eBay listing statuses\n• Set Shopify inventory to 0 for sold/ended eBay items\n• Import eBay orders into sales database")) return;
+
+      btn.disabled = true;
+      btn.textContent = "⏳ Syncing...";
+      try {
+        const result = await apiPost("/api/ebay/sync", {});
+
+        // Show results
+        const card = document.getElementById("syncResultsCard");
+        const div = document.getElementById("syncResults");
+        card.style.display = "block";
+        div.innerHTML = `
+          <p><strong>✅ Checked:</strong> ${result.total_checked} listings</p>
+          <p><strong>🔴 Ended & zeroed on Shopify:</strong> ${result.ended_and_zeroed}</p>
+          <p><strong>📦 Sales imported:</strong> ${result.sales_import?.imported_count || 0}</p>
+          <p><strong>⏭️ Sales skipped (duplicates):</strong> ${result.sales_import?.skipped_count || 0}</p>
+          ${result.errors?.length ? `<p style="color:#f87171"><strong>Errors:</strong> ${result.errors.length}</p>` : ""}
+          ${result.ended_products?.length ? `<p style="margin-top:8px"><strong>Ended items:</strong></p><ul style="margin:4px 0 0 16px">${result.ended_products.map(p => `<li>${p.sku || p.product_id} → inventory zeroed</li>`).join("")}</ul>` : ""}
+        `;
+
+        // Reload products
+        const pRes = await apiFetch("/api/products/with-metafields");
+        state.products = (pRes.products || []).map(p => ({ ...p, _meta: getMetaAll(p) }));
+        renderEbay(document.getElementById("content"));
+      } catch (e) {
+        alert("Sync error: " + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "🔄 Sync eBay → Shopify";
       }
     }
 

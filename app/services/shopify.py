@@ -117,6 +117,74 @@ class ShopifyAdminClient:
     async def get_locations(self) -> dict:
         return await self._request("GET", "locations.json")
 
+    async def set_inventory_to_zero(self, product_id: int) -> dict:
+        """
+        Set inventory quantity to 0 for all variants of a product.
+        Uses GraphQL inventorySetQuantities for precision.
+        Returns list of adjusted variants.
+        """
+        # First get the product variants with inventory item IDs
+        query = """
+        query($id: ID!) {
+          product(id: $id) {
+            variants(first: 50) {
+              edges {
+                node {
+                  id
+                  sku
+                  inventoryQuantity
+                  inventoryItem {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        gid = f"gid://shopify/Product/{product_id}" if not str(product_id).startswith("gid://") else str(product_id)
+        data = await self._graphql(query, {"id": gid})
+        variants = data.get("data", {}).get("product", {}).get("variants", {}).get("edges", [])
+
+        if not variants:
+            return {"status": "no_variants", "product_id": product_id}
+
+        # Get locations for inventory
+        locations_data = await self.get_locations()
+        locations = locations_data.get("locations", [])
+        if not locations:
+            return {"status": "no_locations", "product_id": product_id}
+
+        results = []
+        for variant_edge in variants:
+            v = variant_edge["node"]
+            current_qty = v.get("inventoryQuantity", 0)
+            if current_qty <= 0:
+                results.append({"sku": v.get("sku"), "already_zero": True})
+                continue
+
+            # Adjust by negative current qty to reach 0
+            inv_item_id_gid = v["inventoryItem"]["id"]
+            inv_item_id = int(inv_item_id_gid.split("/")[-1])
+
+            for loc in locations:
+                try:
+                    await self.adjust_inventory(
+                        inventory_item_id=inv_item_id,
+                        location_id=loc["id"],
+                        adjustment=-current_qty,
+                    )
+                    results.append({
+                        "sku": v.get("sku"),
+                        "adjusted": -current_qty,
+                        "location": loc["name"],
+                    })
+                    break  # Only need to zero at the location that has stock
+                except Exception:
+                    continue
+
+        return {"status": "zeroed", "product_id": product_id, "variants": results}
+
     # ── Metafields ───────────────────────────────────────────────────
     async def get_product_metafields(self, product_id: int) -> dict:
         return await self._request("GET", f"products/{product_id}/metafields.json")

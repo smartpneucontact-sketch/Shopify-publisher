@@ -1046,17 +1046,53 @@ async def ebay_refresh_listing_status():
 
 @router.get("/debug/active-skus")
 async def debug_active_skus():
-    """Debug: compare eBay inventory SKUs vs Shopify publisher SKUs."""
+    """Debug: raw eBay API responses + SKU comparison."""
     from app.services.shopify import shopify_client
 
+    # 1. Check token status
+    token_info = {
+        "is_configured": ebay_client.tokens.is_configured,
+        "is_authenticated": ebay_client.tokens.is_authenticated,
+        "token_expired": ebay_client.tokens.expires_at < __import__('time').time() if ebay_client.tokens.expires_at else True,
+        "expires_at": ebay_client.tokens.expires_at,
+    }
+
+    # 2. Try raw inventory call (first page only)
+    raw_inventory = None
+    raw_error = None
     try:
-        ebay_skus = await ebay_client.get_all_active_skus_by_inventory()
+        raw_inventory = await ebay_client.get_items(limit=5, offset=0)
     except Exception as e:
-        return {"error": str(e)}
+        raw_error = str(e)
 
+    # 3. Try to get all inventory SKUs
+    ebay_skus = set()
+    inventory_error = None
+    try:
+        offset = 0
+        while True:
+            result = await ebay_client.get_items(limit=100, offset=offset)
+            if result.get("status") == "error":
+                inventory_error = result
+                break
+            items = result.get("inventoryItems", [])
+            if not items:
+                break
+            for item in items:
+                qty = item.get("availability", {}).get(
+                    "shipToLocationAvailability", {}
+                ).get("quantity", 0)
+                if qty and qty > 0:
+                    ebay_skus.add(item.get("sku", ""))
+            total = result.get("total", 0)
+            offset += 100
+            if offset >= total:
+                break
+    except Exception as e:
+        inventory_error = str(e)
+
+    # 4. Compare with publisher
     products = await shopify_client.get_products_with_metafields()
-
-    # Get SKUs that were pushed to eBay (have listing_id metafield)
     publisher_skus = set()
     for p in products:
         has_listing = any(
@@ -1068,19 +1104,20 @@ async def debug_active_skus():
             if sku:
                 publisher_skus.add(sku)
 
-    # Find mismatches
-    in_ebay_not_publisher = ebay_skus - publisher_skus
-    in_publisher_not_ebay = publisher_skus - ebay_skus  # These get marked ENDED
-    in_both = publisher_skus & ebay_skus  # These get marked ACTIVE
+    in_both = publisher_skus & ebay_skus
+    in_publisher_not_ebay = publisher_skus - ebay_skus
 
     return {
+        "token": token_info,
+        "raw_inventory_sample": raw_inventory,
+        "raw_error": raw_error,
+        "inventory_error": inventory_error,
         "ebay_inventory_count": len(ebay_skus),
+        "ebay_skus": sorted(list(ebay_skus))[:20],
         "publisher_listed_count": len(publisher_skus),
         "matched_active": len(in_both),
-        "marked_ended": sorted(list(in_publisher_not_ebay)),
         "marked_ended_count": len(in_publisher_not_ebay),
-        "in_ebay_only": sorted(list(in_ebay_not_publisher)),
-        "in_ebay_only_count": len(in_ebay_not_publisher),
+        "marked_ended_sample": sorted(list(in_publisher_not_ebay))[:10],
     }
 
 

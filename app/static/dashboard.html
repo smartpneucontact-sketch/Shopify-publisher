@@ -1352,35 +1352,35 @@
     }
 
     // ── Record Sale (dedicated mobile-friendly page) ────────────────
+    // ── Record Sale page state ────────────────────────────────────
+    let rsPageOffset = 0;
+    const RS_PAGE_SIZE = 50;
+
     async function renderRecordSale(el) {
       el.innerHTML = `<div style="display:flex;justify-content:center;padding:20px"><span class="pulse" style="color:var(--text-tertiary)">Loading...</span></div>`;
-      let recentSales = [];
-      try { const r = await apiFetch("/api/sales/?limit=30"); recentSales = Array.isArray(r) ? r : []; } catch(e) {}
+      rsPageOffset = 0;
+      let allSales = [];
+      try { const r = await apiFetch("/api/sales/?limit=500"); allSales = Array.isArray(r) ? r : []; } catch(e) {}
 
-      // Today's stats
       const today = new Date().toISOString().slice(0, 10);
-      const todaySales = recentSales.filter(s => s.sold_at && s.sold_at.startsWith(today));
+      const todaySales = allSales.filter(s => s.sold_at && s.sold_at.startsWith(today));
       const todayRevenue = todaySales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
-
-      function chColor(ch) {
-        return ch === "cash" ? "#22c55e" : ch === "ebay" ? "#e53238" : ch === "leboncoin" ? "#ff6e14" : ch === "ebay_kleinanzeigen" ? "#86b817" : "var(--accent)";
-      }
-      function chLabel(ch) {
-        return ch === "ebay_kleinanzeigen" ? "KA" : (ch || "—").toUpperCase();
-      }
+      const totalRevenue = allSales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
 
       el.innerHTML = `
         <div class="rs-page fade-in">
-          <!-- Today summary -->
           <div class="rs-today">
             <div class="rs-today-count">${todaySales.length}</div>
             <div class="rs-today-label">sale${todaySales.length !== 1 ? 's' : ''} today</div>
             <div class="rs-today-revenue">${todayRevenue.toFixed(2)} EUR</div>
           </div>
 
-          <!-- Form -->
           <form id="rs-form" onsubmit="rsSubmit(event)" class="rs-form" autocomplete="off">
-            <div class="rs-field">
+            <label class="rs-checkbox-row" onclick="rsToggleNoSku()">
+              <input type="checkbox" id="rs-no-sku">
+              <span>No SKU</span>
+            </label>
+            <div class="rs-field" id="rs-sku-field">
               <label for="rs-sku">SKU</label>
               <input type="text" id="rs-sku" inputmode="numeric" placeholder="e.g. 1234" required autofocus>
             </div>
@@ -1393,10 +1393,8 @@
                 <label for="rs-channel">Channel</label>
                 <select id="rs-channel">
                   <option value="cash">Cash</option>
-                  <option value="ebay">eBay</option>
                   <option value="leboncoin">Leboncoin</option>
                   <option value="ebay_kleinanzeigen">Kleinanzeigen</option>
-                  <option value="shopify">Shopify</option>
                 </select>
               </div>
             </div>
@@ -1406,7 +1404,7 @@
             </div>
             <div class="rs-field">
               <label for="rs-notes">Notes (optional)</label>
-              <input type="text" id="rs-notes" placeholder="Any notes">
+              <input type="text" id="rs-notes" placeholder="Any details">
             </div>
             <button type="submit" class="rs-submit" id="rs-submit-btn">Record Sale</button>
             <button type="button" class="rs-sync-btn" onclick="rsSyncShopify()">Sync to Shopify (set stock to 0)</button>
@@ -1414,27 +1412,13 @@
 
           <div id="rs-toast" class="rs-toast"></div>
 
-          <!-- Recent sales list -->
           <div class="rs-recent">
-            <h3>Recent Sales</h3>
-            <div id="rs-list">
-              ${recentSales.length === 0
-                ? '<div class="rs-empty">No sales recorded yet</div>'
-                : recentSales.map(s => `
-                  <div class="rs-sale-row">
-                    <div class="rs-sale-main">
-                      <span class="rs-sale-sku">${s.sku}</span>
-                      <span class="rs-sale-ch" style="color:${chColor(s.channel)}">${chLabel(s.channel)}</span>
-                    </div>
-                    <div class="rs-sale-details">
-                      <span class="rs-sale-price">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</span>
-                      <span class="rs-sale-customer">${s.customer_name || ''}</span>
-                      <span class="rs-sale-date">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</span>
-                    </div>
-                  </div>
-                `).join("")
-              }
+            <div class="rs-recent-header">
+              <h3>All Sales</h3>
+              <span class="rs-total-badge">${allSales.length} sales &middot; ${totalRevenue.toFixed(2)} EUR</span>
             </div>
+            <div id="rs-list"></div>
+            <div id="rs-pagination" style="display:flex;justify-content:center;gap:12px;padding:16px 0"></div>
           </div>
         </div>
 
@@ -1445,6 +1429,16 @@
           .rs-today-count { font-size: 48px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--accent); line-height: 1; }
           .rs-today-label { font-size: 14px; color: var(--text-tertiary); margin-top: 4px; }
           .rs-today-revenue { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+
+          .rs-checkbox-row {
+            display: flex; align-items: center; gap: 10px; cursor: pointer;
+            padding: 10px 0 2px; font-size: 14px; color: var(--text-secondary);
+            -webkit-tap-highlight-color: transparent; user-select: none;
+          }
+          .rs-checkbox-row input[type="checkbox"] {
+            width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer;
+            border-radius: 4px; flex-shrink: 0;
+          }
 
           .rs-form { display: flex; flex-direction: column; gap: 14px; }
           .rs-row { display: flex; gap: 10px; }
@@ -1462,87 +1456,157 @@
             transition: border-color 0.15s;
           }
           .rs-field input:focus, .rs-field select:focus { outline: none; border-color: var(--accent); }
+          .rs-field input:disabled { opacity: 0.4; }
           .rs-field select { font-family: 'DM Sans', sans-serif; font-size: 14px; }
 
           .rs-submit {
-            padding: 16px;
-            background: var(--accent);
-            color: #0a0a0b;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.15s;
-            margin-top: 4px;
-            -webkit-tap-highlight-color: transparent;
+            padding: 16px; background: var(--accent); color: #0a0a0b; border: none;
+            border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;
+            transition: opacity 0.15s; margin-top: 4px; -webkit-tap-highlight-color: transparent;
           }
           .rs-submit:active { opacity: 0.8; }
           .rs-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
           .rs-sync-btn {
-            padding: 12px;
-            background: transparent;
-            color: var(--text-secondary);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.15s;
-            -webkit-tap-highlight-color: transparent;
+            padding: 12px; background: transparent; color: var(--text-secondary);
+            border: 1px solid var(--border); border-radius: 10px; font-size: 13px;
+            cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent;
           }
           .rs-sync-btn:active { background: var(--bg-tertiary); }
 
           .rs-toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
+            position: fixed; bottom: 30px; left: 50%;
             transform: translateX(-50%) translateY(100px);
-            padding: 14px 24px;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 500;
-            z-index: 1000;
-            transition: transform 0.3s ease;
-            pointer-events: none;
-            max-width: 90vw;
-            text-align: center;
+            padding: 14px 24px; border-radius: 12px; font-size: 14px; font-weight: 500;
+            z-index: 1000; transition: transform 0.3s ease; pointer-events: none;
+            max-width: 90vw; text-align: center;
           }
           .rs-toast.show { transform: translateX(-50%) translateY(0); }
           .rs-toast.success { background: #22c55e; color: #fff; }
           .rs-toast.error { background: #ef4444; color: #fff; }
 
-          .rs-recent { margin-top: 28px; }
-          .rs-recent h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
+          .rs-recent { margin-top: 28px; padding-bottom: 40px; }
+          .rs-recent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+          .rs-recent-header h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+          .rs-total-badge { font-size: 12px; color: var(--text-tertiary); font-family: 'JetBrains Mono', monospace; }
           .rs-empty { text-align: center; color: var(--text-tertiary); padding: 30px 0; font-size: 13px; }
 
           .rs-sale-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border-subtle);
-            gap: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid var(--border-subtle); gap: 8px;
           }
-          .rs-sale-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+          .rs-sale-main { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
           .rs-sale-sku { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 500; color: var(--accent); }
-          .rs-sale-ch { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 6px; background: var(--bg-tertiary); border-radius: 4px; }
+          .rs-sale-ch { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 6px; background: var(--bg-tertiary); border-radius: 4px; flex-shrink: 0; }
           .rs-sale-details { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
           .rs-sale-price { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; }
           .rs-sale-customer { font-size: 12px; color: var(--text-tertiary); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
           .rs-sale-date { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
+          .rs-sale-notes { font-size: 11px; color: var(--text-tertiary); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+
+          .rs-pager-btn {
+            padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--bg-secondary); color: var(--text-secondary); font-size: 13px;
+            cursor: pointer; -webkit-tap-highlight-color: transparent;
+          }
+          .rs-pager-btn:active { background: var(--bg-tertiary); }
+          .rs-pager-btn:disabled { opacity: 0.3; cursor: default; }
 
           @media (max-width: 600px) {
             .rs-page { padding: 0 2px; }
             .rs-sale-customer { display: none; }
+            .rs-sale-notes { display: none; }
             .rs-sale-details { gap: 8px; }
           }
         </style>
       `;
+
+      // Render first page of sales
+      window._rsSalesData = allSales;
+      rsRenderSalesList();
+    }
+
+    function rsChColor(ch) {
+      return ch === "cash" ? "#22c55e" : ch === "ebay" ? "#e53238" : ch === "leboncoin" ? "#ff6e14" : ch === "ebay_kleinanzeigen" ? "#86b817" : "var(--accent)";
+    }
+    function rsChLabel(ch) {
+      return ch === "ebay_kleinanzeigen" ? "KA" : (ch || "—").toUpperCase();
+    }
+
+    function rsRenderSalesList() {
+      const allSales = window._rsSalesData || [];
+      const page = allSales.slice(rsPageOffset, rsPageOffset + RS_PAGE_SIZE);
+      const listEl = document.getElementById("rs-list");
+      const pagEl = document.getElementById("rs-pagination");
+      if (!listEl) return;
+
+      if (allSales.length === 0) {
+        listEl.innerHTML = '<div class="rs-empty">No sales recorded yet</div>';
+        pagEl.innerHTML = '';
+        return;
+      }
+
+      listEl.innerHTML = page.map(s => `
+        <div class="rs-sale-row">
+          <div class="rs-sale-main">
+            <span class="rs-sale-sku">${s.sku || '—'}</span>
+            <span class="rs-sale-ch" style="color:${rsChColor(s.channel)}">${rsChLabel(s.channel)}</span>
+            ${s.notes && s.notes !== 'Recorded from dashboard' ? '<span class="rs-sale-notes">' + s.notes + '</span>' : ''}
+          </div>
+          <div class="rs-sale-details">
+            <span class="rs-sale-price">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</span>
+            <span class="rs-sale-customer">${s.customer_name || ''}</span>
+            <span class="rs-sale-date">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</span>
+          </div>
+        </div>
+      `).join("");
+
+      const totalPages = Math.ceil(allSales.length / RS_PAGE_SIZE);
+      const currentPage = Math.floor(rsPageOffset / RS_PAGE_SIZE) + 1;
+      if (totalPages > 1) {
+        pagEl.innerHTML = `
+          <button class="rs-pager-btn" onclick="rsGotoPage(-1)" ${rsPageOffset === 0 ? 'disabled' : ''}>Previous</button>
+          <span style="font-size:13px;color:var(--text-tertiary);align-self:center">${currentPage} / ${totalPages}</span>
+          <button class="rs-pager-btn" onclick="rsGotoPage(1)" ${rsPageOffset + RS_PAGE_SIZE >= allSales.length ? 'disabled' : ''}>Next</button>
+        `;
+      } else {
+        pagEl.innerHTML = '';
+      }
+    }
+
+    function rsGotoPage(dir) {
+      const allSales = window._rsSalesData || [];
+      rsPageOffset += dir * RS_PAGE_SIZE;
+      if (rsPageOffset < 0) rsPageOffset = 0;
+      if (rsPageOffset >= allSales.length) rsPageOffset = Math.max(0, allSales.length - RS_PAGE_SIZE);
+      rsRenderSalesList();
+      document.getElementById("rs-list").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function rsToggleNoSku() {
+      // Let the native checkbox toggle first
+      setTimeout(() => {
+        const checked = document.getElementById("rs-no-sku").checked;
+        const skuField = document.getElementById("rs-sku-field");
+        const skuInput = document.getElementById("rs-sku");
+        if (checked) {
+          skuField.style.opacity = "0.4";
+          skuInput.disabled = true;
+          skuInput.required = false;
+          skuInput.value = "";
+          document.getElementById("rs-price").focus();
+        } else {
+          skuField.style.opacity = "1";
+          skuInput.disabled = false;
+          skuInput.required = true;
+          skuInput.focus();
+        }
+      }, 0);
     }
 
     function rsToast(msg, ok) {
       const t = document.getElementById("rs-toast");
+      if (!t) return;
       t.textContent = msg;
       t.className = "rs-toast " + (ok ? "success" : "error") + " show";
       setTimeout(() => { t.classList.remove("show"); }, 3000);
@@ -1550,14 +1614,16 @@
 
     async function rsSubmit(event) {
       event.preventDefault();
-      const sku = document.getElementById("rs-sku").value.trim();
+      const noSku = document.getElementById("rs-no-sku").checked;
+      const sku = noSku ? ("NOSSKU-" + Date.now()) : document.getElementById("rs-sku").value.trim();
       const price = parseFloat(document.getElementById("rs-price").value);
       const channel = document.getElementById("rs-channel").value;
       const customer = document.getElementById("rs-customer").value.trim();
       const notes = document.getElementById("rs-notes").value.trim();
       const btn = document.getElementById("rs-submit-btn");
 
-      if (!sku || !price) { rsToast("SKU and price required", false); return; }
+      if (!noSku && !sku) { rsToast("SKU is required (or check No SKU)", false); return; }
+      if (!price) { rsToast("Price is required", false); return; }
 
       btn.disabled = true;
       btn.textContent = "Saving...";
@@ -1565,13 +1631,16 @@
         await apiPost("/api/sales/", {
           sku, channel, sale_price: price, quantity: 1,
           customer_name: customer || null,
-          notes: notes || "Recorded from dashboard"
+          notes: notes || (noSku ? "No SKU sale" : "Recorded from dashboard")
         });
-        rsToast("Sale recorded: " + sku + " — " + price.toFixed(2) + " EUR", true);
+        const label = noSku ? "No-SKU sale" : ("SKU " + sku);
+        rsToast("Sale recorded: " + label + " — " + price.toFixed(2) + " EUR", true);
         document.getElementById("rs-form").reset();
-        // Focus SKU field for quick next entry
+        // Reset no-sku state
+        document.getElementById("rs-sku-field").style.opacity = "1";
+        document.getElementById("rs-sku").disabled = false;
+        document.getElementById("rs-sku").required = true;
         document.getElementById("rs-sku").focus();
-        // Refresh page to update list and today count
         setTimeout(() => renderRecordSale(document.getElementById("content")), 1200);
       } catch (e) {
         rsToast("Error: " + e.message, false);

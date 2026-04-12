@@ -225,6 +225,34 @@ class EbayInventoryClient:
     async def get_offers(self, sku: str) -> dict:
         return await self._request("GET", f"{self.base}/offer?sku={sku}")
 
+    async def get_all_offers(self, limit: int = 200, offset: int = 0) -> dict:
+        """Fetch all offers (paginated)."""
+        return await self._request("GET", f"{self.base}/offer?limit={limit}&offset={offset}")
+
+    async def get_all_active_skus(self) -> set:
+        """
+        Fetch ALL offers from eBay, return set of SKUs that have status PUBLISHED.
+        This is the source of truth for what's actually live on eBay.
+        """
+        active_skus = set()
+        offset = 0
+        limit = 200
+
+        while True:
+            result = await self.get_all_offers(limit=limit, offset=offset)
+            offers = result.get("offers", [])
+            if not offers:
+                break
+            for offer in offers:
+                if offer.get("status") == "PUBLISHED":
+                    active_skus.add(offer.get("sku", ""))
+            total = result.get("total", 0)
+            offset += limit
+            if offset >= total:
+                break
+
+        return active_skus
+
     async def update_offer(self, offer_id: str, offer_data: dict) -> dict:
         return await self._request("PUT", f"{self.base}/offer/{offer_id}", json_body=offer_data)
 

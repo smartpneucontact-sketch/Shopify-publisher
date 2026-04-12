@@ -38,8 +38,11 @@ class Settings(BaseSettings):
     # ── Product Manager Service ──────────────────────────────────────
     PRODUCT_MANAGER_SERVICE_URL: str = "http://smartpneu-product-manager.railway.internal:5000"
 
+    # ── Data Directory (persistent volume on Railway) ──────────────
+    DATA_DIR: str = "/data"
+
     # ── Sales Database ───────────────────────────────────────────────
-    SALES_DB_PATH: str = "data/sales.db"
+    SALES_DB_PATH: str = "/data/sales.db"
 
     class Config:
         env_file = ".env"

@@ -44,8 +44,10 @@ SCOPES = [
     "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
 ]
 
-# Token persistence file
-TOKEN_FILE = Path("/tmp/ebay_tokens.json")
+# Token persistence file — uses /data on Railway (persistent volume), /tmp locally
+DATA_DIR = Path(os.getenv("DATA_DIR", "/data" if os.path.isdir("/data") else "/tmp"))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+TOKEN_FILE = DATA_DIR / "ebay_tokens.json"
 
 
 class EbayTokenManager:

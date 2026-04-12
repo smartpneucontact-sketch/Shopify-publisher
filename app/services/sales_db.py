@@ -465,5 +465,6 @@ class SalesDB:
             return await self._get_sale_by_id(db, sale_id)
 
 
-# Singleton instance
-sales_db = SalesDB()
+# Singleton instance — uses persistent volume path from config
+from app.config import settings
+sales_db = SalesDB(db_path=settings.SALES_DB_PATH)

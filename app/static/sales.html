@@ -542,6 +542,7 @@
                             <button type="submit" class="btn-primary">Record Sale</button>
                             <button type="reset" class="btn-secondary">Clear Form</button>
                             <button type="button" class="btn-secondary" id="importShopifyBtn">Import Shopify Orders</button>
+                            <button type="button" class="btn-secondary" id="importEbayBtn" style="background:#e53238;border-color:#e53238;">Import eBay Orders</button>
                         </div>
                     </div>
                 </form>
@@ -853,6 +854,33 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Import Shopify Orders';
+            }
+        });
+
+        // Import eBay
+        document.getElementById('importEbayBtn').addEventListener('click', async () => {
+            if (!confirm('Import eBay orders from the last 30 days? This may take a moment.')) return;
+
+            const btn = document.getElementById('importEbayBtn');
+            btn.disabled = true;
+            btn.textContent = 'Importing...';
+
+            try {
+                const response = await fetch(`${API_BASE}/sales/import/ebay?days=30`, { method: 'POST' });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Failed to import');
+                }
+                const data = await response.json();
+                showMessage(`eBay: ${data.imported_count} imported, ${data.skipped_count} skipped`, 'success');
+                await new Promise(r => setTimeout(r, 1000));
+                loadSummary();
+            } catch (error) {
+                console.error('Error importing eBay:', error);
+                showMessage(error.message || 'Error importing eBay orders', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Import eBay Orders';
             }
         });
 

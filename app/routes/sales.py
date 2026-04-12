@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.services.sales_db import sales_db
 from app.services.shopify import shopify_client
+from app.services.ebay import ebay_client
 
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -203,6 +204,149 @@ async def import_shopify_orders():
         raise HTTPException(
             status_code=500,
             detail=f"Error importing Shopify orders: {str(e)}"
+        )
+
+
+@router.post("/import/ebay", status_code=202)
+async def import_ebay_orders(
+    days: int = Query(30, ge=1, le=365, description="Fetch orders from the last N days"),
+):
+    """
+    Import recent eBay orders as sales records.
+
+    Fetches completed orders from eBay via the Sell Fulfillment API
+    and imports them as sales, avoiding duplicates by checking order_ref.
+
+    Query Parameters:
+        days: Number of days of order history to import (default 30, max 365)
+
+    Returns:
+        Dictionary with import statistics (imported_count, skipped_count, errors)
+    """
+    if not ebay_client.tokens.is_authenticated:
+        raise HTTPException(
+            status_code=401,
+            detail="eBay not authenticated. Complete the OAuth flow at /api/ebay/auth first."
+        )
+
+    try:
+        orders = await ebay_client.get_all_recent_orders(days=days)
+
+        if not orders:
+            return {
+                "imported_count": 0,
+                "skipped_count": 0,
+                "errors": [],
+                "message": f"No eBay orders found in the last {days} days"
+            }
+
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+
+        # Pre-fetch existing eBay sales to check duplicates efficiently
+        existing_sales = sales_db.get_sales(
+            channel="ebay",
+            start_date=None,
+            end_date=None,
+            sku=None,
+            limit=10000,
+            offset=0,
+        )
+        existing_refs = {s.get("order_ref") for s in existing_sales if s.get("order_ref")}
+
+        for order in orders:
+            try:
+                order_id = order.get("orderId", "")
+
+                # Skip if already imported
+                if order_id in existing_refs:
+                    skipped_count += 1
+                    continue
+
+                # Extract buyer info
+                buyer = order.get("buyer", {})
+                buyer_name = buyer.get("username", "")
+
+                # Extract total price
+                price_summary = order.get("pricingSummary", {})
+                total = price_summary.get("total", {})
+                total_price = float(total.get("value", 0))
+                currency = total.get("currency", "EUR")
+
+                # Extract line items for SKU and product info
+                line_items = order.get("lineItems", [])
+                creation_date = order.get("creationDate")
+
+                if not line_items:
+                    # Record order-level sale if no line items
+                    sale_data = {
+                        "sku": "EBAY-UNKNOWN",
+                        "channel": "ebay",
+                        "sale_price": total_price,
+                        "quantity": 1,
+                        "order_ref": order_id,
+                        "customer_name": buyer_name,
+                        "notes": f"eBay order {order_id} (no line items)",
+                        "sold_at": creation_date or datetime.utcnow().isoformat(),
+                    }
+                    result = sales_db.record_sale(sale_data)
+                    if result:
+                        imported_count += 1
+                    continue
+
+                # Import each line item as a separate sale record
+                for item in line_items:
+                    sku = item.get("sku") or item.get("legacyItemId", "EBAY-NOSKU")
+                    title = item.get("title", "")
+                    qty = item.get("quantity", 1)
+
+                    item_price_info = item.get("total", item.get("lineItemCost", {}))
+                    item_price = float(item_price_info.get("value", 0)) if item_price_info else total_price
+
+                    # Build a unique ref per line item to avoid duplicates
+                    line_ref = f"{order_id}:{item.get('lineItemId', sku)}"
+
+                    if line_ref in existing_refs:
+                        skipped_count += 1
+                        continue
+
+                    sale_data = {
+                        "sku": sku,
+                        "channel": "ebay",
+                        "sale_price": item_price,
+                        "quantity": qty,
+                        "order_ref": line_ref,
+                        "customer_name": buyer_name,
+                        "notes": f"eBay order {order_id}",
+                        "sold_at": creation_date or datetime.utcnow().isoformat(),
+                        "product_title": title,
+                    }
+
+                    result = sales_db.record_sale(sale_data)
+                    if result:
+                        imported_count += 1
+                        existing_refs.add(line_ref)
+
+            except Exception as e:
+                errors.append({
+                    "order_id": order.get("orderId"),
+                    "error": str(e)
+                })
+
+        return {
+            "imported_count": imported_count,
+            "skipped_count": skipped_count,
+            "errors": errors,
+            "message": f"Imported {imported_count} eBay sales, skipped {skipped_count} duplicates"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error importing eBay orders: {str(e)}"
         )
 
 

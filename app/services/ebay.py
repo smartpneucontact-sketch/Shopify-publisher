@@ -156,11 +156,12 @@ class EbayTokenManager:
 
 
 class EbayInventoryClient:
-    """eBay Sell Inventory API — create items, offers, and publish listings."""
+    """eBay Sell Inventory + Fulfillment API — listings, offers, and order management."""
 
     def __init__(self, token_manager: EbayTokenManager):
         self.tokens = token_manager
         self.base = f"{EBAY_API_BASE}/sell/inventory/v1"
+        self.fulfillment_base = f"{EBAY_API_BASE}/sell/fulfillment/v1"
         self.account_base = f"{EBAY_API_BASE}/sell/account/v1"
         self.taxonomy_base = f"{EBAY_API_BASE}/commerce/taxonomy/v1"
         self.metadata_base = f"{EBAY_API_BASE}/sell/metadata/v1"
@@ -344,6 +345,76 @@ class EbayInventoryClient:
                 return {"status": "error", "code": resp.status_code, "errors": resp.json()}
             except Exception:
                 return {"status": "error", "code": resp.status_code, "errors": resp.text}
+
+    # ── Orders (Sell Fulfillment API) ──────────────────────────────
+    async def get_orders(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        order_fulfillment_status: Optional[str] = None,
+        creation_date_from: Optional[str] = None,
+        creation_date_to: Optional[str] = None,
+    ) -> dict:
+        """
+        GET /sell/fulfillment/v1/order — fetch eBay orders.
+
+        Args:
+            limit: Max orders per page (max 200)
+            offset: Pagination offset
+            order_fulfillment_status: Filter by status (NOT_STARTED, IN_PROGRESS, FULFILLED)
+            creation_date_from: ISO 8601 date, e.g. "2025-01-01T00:00:00.000Z"
+            creation_date_to: ISO 8601 date
+        """
+        filters = []
+        if order_fulfillment_status:
+            filters.append(f"orderfulfillmentstatus:{{{order_fulfillment_status}}}")
+        if creation_date_from:
+            filters.append(f"creationdate:[{creation_date_from}..]")
+        if creation_date_to:
+            # Combine with from if both present
+            if creation_date_from:
+                filters = [f for f in filters if not f.startswith("creationdate:")]
+                filters.append(f"creationdate:[{creation_date_from}..{creation_date_to}]")
+            else:
+                filters.append(f"creationdate:[..{creation_date_to}]")
+
+        filter_str = f"&filter={','.join(filters)}" if filters else ""
+        url = f"{self.fulfillment_base}/order?limit={limit}&offset={offset}{filter_str}"
+        return await self._request("GET", url)
+
+    async def get_order(self, order_id: str) -> dict:
+        """GET /sell/fulfillment/v1/order/{orderId} — fetch single order."""
+        return await self._request("GET", f"{self.fulfillment_base}/order/{order_id}")
+
+    async def get_all_recent_orders(self, days: int = 30) -> list:
+        """
+        Fetch all orders from the last N days, handling pagination.
+        Returns a flat list of order dicts.
+        """
+        from datetime import datetime, timedelta, timezone
+        date_from = (datetime.now(timezone.utc) - timedelta(days=days)).strftime(
+            "%Y-%m-%dT00:00:00.000Z"
+        )
+        all_orders = []
+        offset = 0
+        limit = 50
+
+        while True:
+            result = await self.get_orders(
+                limit=limit,
+                offset=offset,
+                creation_date_from=date_from,
+            )
+            orders = result.get("orders", [])
+            if not orders:
+                break
+            all_orders.extend(orders)
+            total = result.get("total", 0)
+            offset += limit
+            if offset >= total:
+                break
+
+        return all_orders
 
     # ── High-Level: Publish a Shopify product to eBay ─────────────
     async def publish_product(

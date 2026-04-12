@@ -975,17 +975,19 @@ async def ebay_listings_analytics():
 @router.post("/listings/refresh-status")
 async def ebay_refresh_listing_status():
     """
-    Refresh eBay status by checking which SKUs have inventory qty > 0 on eBay.
-    SKUs with qty > 0 = ACTIVE, SKUs with qty = 0 or missing = ENDED (sold).
+    Refresh eBay status using inventory quantities.
+    - qty > 0 → ACTIVE (still listed)
+    - qty = 0 → ENDED (sold)
+    - not in eBay inventory at all → keep current status (don't change)
     Only updates metafields for items whose status actually changed.
     """
     import asyncio
     from app.services.shopify import shopify_client
 
-    # Step 1: Get SKUs with inventory on eBay (qty > 0)
-    active_skus = await ebay_client.get_all_active_skus_by_inventory()
+    # Step 1: Get ALL eBay inventory items with quantities
+    sku_qty = await ebay_client.get_all_inventory_skus()
 
-    if not active_skus:
+    if not sku_qty:
         return {
             "updated": 0,
             "error": "Could not fetch inventory from eBay. Check API connection.",
@@ -995,6 +997,7 @@ async def ebay_refresh_listing_status():
     products = await shopify_client.get_products_with_metafields()
     updated = []
     to_update = []  # (product_id, new_status, sku)
+    not_in_ebay = []
 
     for p in products:
         has_listing = False
@@ -1012,15 +1015,21 @@ async def ebay_refresh_listing_status():
         if not sku:
             continue
 
-        new_status = "ACTIVE" if sku in active_skus else "ENDED"
+        if sku in sku_qty:
+            # SKU exists in eBay inventory — check quantity
+            new_status = "ACTIVE" if sku_qty[sku] > 0 else "ENDED"
+        else:
+            # SKU not in eBay inventory at all — keep current status
+            not_in_ebay.append(sku)
+            new_status = old_status or "ACTIVE"
 
         # Only update if status actually changed
         if new_status != old_status:
             to_update.append((p["id"], new_status, sku))
 
-        updated.append({"sku": sku, "ebay_status": new_status})
+        updated.append({"sku": sku, "ebay_status": new_status, "ebay_qty": sku_qty.get(sku, "N/A")})
 
-    # Step 3: Batch update only changed metafields (in groups of 5 to avoid timeout)
+    # Step 3: Batch update only changed metafields (groups of 5)
     changed = []
     for i in range(0, len(to_update), 5):
         batch = to_update[i:i + 5]
@@ -1039,7 +1048,8 @@ async def ebay_refresh_listing_status():
         "total_listed": len(updated),
         "active": active_count,
         "ended": ended_count,
-        "ebay_inventory_count": len(active_skus),
+        "ebay_total_inventory": len(sku_qty),
+        "not_in_ebay_inventory": not_in_ebay,
         "changed": changed,
     }
 
@@ -1065,31 +1075,16 @@ async def debug_active_skus():
     except Exception as e:
         raw_error = str(e)
 
-    # 3. Try to get all inventory SKUs
-    ebay_skus = set()
+    # 3. Get all inventory SKUs with quantities
+    sku_qty = {}
     inventory_error = None
     try:
-        offset = 0
-        while True:
-            result = await ebay_client.get_items(limit=100, offset=offset)
-            if result.get("status") == "error":
-                inventory_error = result
-                break
-            items = result.get("inventoryItems", [])
-            if not items:
-                break
-            for item in items:
-                qty = item.get("availability", {}).get(
-                    "shipToLocationAvailability", {}
-                ).get("quantity", 0)
-                if qty and qty > 0:
-                    ebay_skus.add(item.get("sku", ""))
-            total = result.get("total", 0)
-            offset += 100
-            if offset >= total:
-                break
+        sku_qty = await ebay_client.get_all_inventory_skus()
     except Exception as e:
         inventory_error = str(e)
+
+    ebay_skus = {sku for sku, qty in sku_qty.items() if qty and qty > 0}
+    sold_skus = {sku for sku, qty in sku_qty.items() if qty == 0}
 
     # 4. Compare with publisher
     products = await shopify_client.get_products_with_metafields()
@@ -1105,19 +1100,22 @@ async def debug_active_skus():
                 publisher_skus.add(sku)
 
     in_both = publisher_skus & ebay_skus
-    in_publisher_not_ebay = publisher_skus - ebay_skus
+    in_publisher_sold = publisher_skus & sold_skus
+    not_in_ebay = publisher_skus - set(sku_qty.keys())
 
     return {
         "token": token_info,
         "raw_inventory_sample": raw_inventory,
         "raw_error": raw_error,
         "inventory_error": inventory_error,
-        "ebay_inventory_count": len(ebay_skus),
-        "ebay_skus": sorted(list(ebay_skus))[:20],
+        "ebay_total_items": len(sku_qty),
+        "ebay_qty_gt_0": len(ebay_skus),
+        "ebay_qty_0_sold": len(sold_skus),
+        "sold_skus": sorted(list(sold_skus)),
         "publisher_listed_count": len(publisher_skus),
-        "matched_active": len(in_both),
-        "marked_ended_count": len(in_publisher_not_ebay),
-        "marked_ended_sample": sorted(list(in_publisher_not_ebay))[:10],
+        "active_matched": len(in_both),
+        "sold_matched": sorted(list(in_publisher_sold)),
+        "not_in_ebay_at_all": sorted(list(not_in_ebay)),
     }
 
 
@@ -1135,11 +1133,11 @@ async def ebay_sync_inventory():
     from app.services.shopify import shopify_client
     from app.services.sales_db import sales_db
 
-    # Step 1: Get active SKUs from eBay inventory (qty > 0)
-    active_skus = await ebay_client.get_all_active_skus_by_inventory()
-    if not active_skus:
+    # Step 1: Get ALL eBay inventory items with quantities
+    sku_qty = await ebay_client.get_all_inventory_skus()
+    if not sku_qty:
         return {
-            "error": "Could not fetch active SKUs from eBay. Check API connection.",
+            "error": "Could not fetch inventory from eBay. Check API connection.",
             "total_checked": 0, "ended_and_zeroed": 0, "ended_products": [],
             "sales_import": {}, "errors": [], "synced": [],
         }
@@ -1166,7 +1164,10 @@ async def ebay_sync_inventory():
         if not sku:
             continue
 
-        new_status = "ACTIVE" if sku in active_skus else "ENDED"
+        if sku in sku_qty:
+            new_status = "ACTIVE" if sku_qty[sku] > 0 else "ENDED"
+        else:
+            new_status = old_status or "ACTIVE"
 
         try:
             # Update metafield

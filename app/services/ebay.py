@@ -264,11 +264,12 @@ class EbayInventoryClient:
 
         return active_skus
 
-    async def get_all_active_skus_by_inventory(self) -> set:
+    async def get_all_inventory_skus(self) -> dict:
         """
-        Fallback: fetch all inventory items and check which ones have quantity > 0.
+        Fetch ALL eBay inventory items. Returns dict of {sku: quantity}.
+        Includes items with qty=0 (sold) so we can detect them.
         """
-        active_skus = set()
+        sku_qty = {}
         offset = 0
         limit = 100
 
@@ -276,24 +277,30 @@ class EbayInventoryClient:
             while True:
                 result = await self.get_items(limit=limit, offset=offset)
                 if result.get("status") == "error":
+                    print(f"⚠️ eBay inventory error at offset {offset}: {result}")
                     break
                 items = result.get("inventoryItems", [])
                 if not items:
                     break
                 for item in items:
+                    sku = item.get("sku", "")
                     qty = item.get("availability", {}).get(
                         "shipToLocationAvailability", {}
                     ).get("quantity", 0)
-                    if qty and qty > 0:
-                        active_skus.add(item.get("sku", ""))
+                    sku_qty[sku] = qty
                 total = result.get("total", 0)
                 offset += limit
                 if offset >= total:
                     break
         except Exception as e:
-            print(f"⚠️ get_all_active_skus_by_inventory error: {e}")
+            print(f"⚠️ get_all_inventory_skus error: {e}")
 
-        return active_skus
+        return sku_qty
+
+    async def get_all_active_skus_by_inventory(self) -> set:
+        """Convenience: return only SKUs with qty > 0."""
+        sku_qty = await self.get_all_inventory_skus()
+        return {sku for sku, qty in sku_qty.items() if qty and qty > 0}
 
     async def update_offer(self, offer_id: str, offer_data: dict) -> dict:
         return await self._request("PUT", f"{self.base}/offer/{offer_id}", json_body=offer_data)

@@ -975,29 +975,30 @@ async def ebay_listings_analytics():
 @router.post("/listings/refresh-status")
 async def ebay_refresh_listing_status():
     """
-    Refresh eBay status using inventory quantities.
-    - qty > 0 → ACTIVE (still listed)
-    - qty = 0 → ENDED (sold)
-    - not in eBay inventory at all → keep current status (don't change)
-    Only updates metafields for items whose status actually changed.
+    Refresh eBay listing status by checking orders (the only reliable source).
+    eBay does NOT decrement inventory qty on sale, so we use orders to detect sold SKUs.
+    - SKU appears in eBay orders → ENDED (sold)
+    - SKU not in orders → ACTIVE (still listed)
     """
     import asyncio
     from app.services.shopify import shopify_client
 
-    # Step 1: Get ALL eBay inventory items with quantities
-    sku_qty = await ebay_client.get_all_inventory_skus()
+    if not ebay_client.tokens.is_authenticated:
+        return {"updated": 0, "error": "eBay not authenticated. Complete OAuth first."}
 
-    if not sku_qty:
-        return {
-            "updated": 0,
-            "error": "Could not fetch inventory from eBay. Check API connection.",
-        }
+    # Step 1: Fetch all eBay orders (last 90 days) to find sold SKUs
+    orders = await ebay_client.get_all_recent_orders(days=90)
+    sold_skus = set()
+    for order in orders:
+        for item in order.get("lineItems", []):
+            sku = item.get("sku")
+            if sku:
+                sold_skus.add(sku)
 
     # Step 2: Get Shopify products that were pushed to eBay
     products = await shopify_client.get_products_with_metafields()
     updated = []
-    to_update = []  # (product_id, new_status, sku)
-    not_in_ebay = []
+    to_update = []
 
     for p in products:
         has_listing = False
@@ -1015,21 +1016,14 @@ async def ebay_refresh_listing_status():
         if not sku:
             continue
 
-        if sku in sku_qty:
-            # SKU exists in eBay inventory — check quantity
-            new_status = "ACTIVE" if sku_qty[sku] > 0 else "ENDED"
-        else:
-            # SKU not in eBay inventory at all — keep current status
-            not_in_ebay.append(sku)
-            new_status = old_status or "ACTIVE"
+        new_status = "ENDED" if sku in sold_skus else "ACTIVE"
 
-        # Only update if status actually changed
         if new_status != old_status:
             to_update.append((p["id"], new_status, sku))
 
-        updated.append({"sku": sku, "ebay_status": new_status, "ebay_qty": sku_qty.get(sku, "N/A")})
+        updated.append({"sku": sku, "ebay_status": new_status, "sold": sku in sold_skus})
 
-    # Step 3: Batch update only changed metafields (groups of 5)
+    # Step 3: Batch update changed metafields (groups of 5)
     changed = []
     for i in range(0, len(to_update), 5):
         batch = to_update[i:i + 5]
@@ -1048,8 +1042,8 @@ async def ebay_refresh_listing_status():
         "total_listed": len(updated),
         "active": active_count,
         "ended": ended_count,
-        "ebay_total_inventory": len(sku_qty),
-        "not_in_ebay_inventory": not_in_ebay,
+        "sold_skus_from_orders": sorted(list(sold_skus)),
+        "orders_fetched": len(orders),
         "changed": changed,
     }
 
@@ -1075,16 +1069,25 @@ async def debug_active_skus():
     except Exception as e:
         raw_error = str(e)
 
-    # 3. Get all inventory SKUs with quantities
-    sku_qty = {}
+    # 3. Get sold SKUs from orders (the only reliable method)
+    sold_skus = set()
+    orders_count = 0
     inventory_error = None
     try:
-        sku_qty = await ebay_client.get_all_inventory_skus()
+        if ebay_client.tokens.is_authenticated:
+            orders = await ebay_client.get_all_recent_orders(days=90)
+            orders_count = len(orders)
+            for order in orders:
+                for item in order.get("lineItems", []):
+                    sku = item.get("sku")
+                    if sku:
+                        sold_skus.add(sku)
+        else:
+            inventory_error = "Not authenticated"
     except Exception as e:
         inventory_error = str(e)
 
-    ebay_skus = {sku for sku, qty in sku_qty.items() if qty and qty > 0}
-    sold_skus = {sku for sku, qty in sku_qty.items() if qty == 0}
+    ebay_skus = set()  # not used for detection anymore
 
     # 4. Compare with publisher
     products = await shopify_client.get_products_with_metafields()
@@ -1099,23 +1102,21 @@ async def debug_active_skus():
             if sku:
                 publisher_skus.add(sku)
 
-    in_both = publisher_skus & ebay_skus
-    in_publisher_sold = publisher_skus & sold_skus
-    not_in_ebay = publisher_skus - set(sku_qty.keys())
+    sold_from_publisher = publisher_skus & sold_skus
+    active_from_publisher = publisher_skus - sold_skus
 
     return {
         "token": token_info,
         "raw_inventory_sample": raw_inventory,
         "raw_error": raw_error,
         "inventory_error": inventory_error,
-        "ebay_total_items": len(sku_qty),
-        "ebay_qty_gt_0": len(ebay_skus),
-        "ebay_qty_0_sold": len(sold_skus),
-        "sold_skus": sorted(list(sold_skus)),
+        "orders_fetched": orders_count,
+        "sold_skus_from_orders": sorted(list(sold_skus)),
+        "sold_count": len(sold_skus),
         "publisher_listed_count": len(publisher_skus),
-        "active_matched": len(in_both),
-        "sold_matched": sorted(list(in_publisher_sold)),
-        "not_in_ebay_at_all": sorted(list(not_in_ebay)),
+        "publisher_active": len(active_from_publisher),
+        "publisher_sold": len(sold_from_publisher),
+        "publisher_sold_skus": sorted(list(sold_from_publisher)),
     }
 
 
@@ -1133,14 +1134,21 @@ async def ebay_sync_inventory():
     from app.services.shopify import shopify_client
     from app.services.sales_db import sales_db
 
-    # Step 1: Get ALL eBay inventory items with quantities
-    sku_qty = await ebay_client.get_all_inventory_skus()
-    if not sku_qty:
+    if not ebay_client.tokens.is_authenticated:
         return {
-            "error": "Could not fetch inventory from eBay. Check API connection.",
+            "error": "eBay not authenticated. Complete OAuth first.",
             "total_checked": 0, "ended_and_zeroed": 0, "ended_products": [],
             "sales_import": {}, "errors": [], "synced": [],
         }
+
+    # Step 1: Fetch eBay orders to find sold SKUs (source of truth)
+    orders = await ebay_client.get_all_recent_orders(days=90)
+    sold_skus = set()
+    for order in orders:
+        for item in order.get("lineItems", []):
+            sku = item.get("sku")
+            if sku:
+                sold_skus.add(sku)
 
     products = await shopify_client.get_products_with_metafields()
     synced = []
@@ -1164,10 +1172,7 @@ async def ebay_sync_inventory():
         if not sku:
             continue
 
-        if sku in sku_qty:
-            new_status = "ACTIVE" if sku_qty[sku] > 0 else "ENDED"
-        else:
-            new_status = old_status or "ACTIVE"
+        new_status = "ENDED" if sku in sold_skus else "ACTIVE"
 
         try:
             # Update metafield

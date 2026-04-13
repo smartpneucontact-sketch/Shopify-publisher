@@ -1385,9 +1385,9 @@
       el.innerHTML = `
         <div class="rs-page fade-in">
           <div class="rs-today">
-            <div class="rs-today-count">${todaySales.length}</div>
+            <div class="rs-today-count" id="rs-today-count">${todaySales.length}</div>
             <div class="rs-today-label">sale${todaySales.length !== 1 ? 's' : ''} today</div>
-            <div class="rs-today-revenue">${todayRevenue.toFixed(2)} EUR</div>
+            <div class="rs-today-revenue" id="rs-today-rev">${todayRevenue.toFixed(2)} EUR</div>
           </div>
 
           <form id="rs-form" onsubmit="rsSubmit(event)" class="rs-form" autocomplete="off">
@@ -1435,7 +1435,7 @@
           <div class="rs-recent">
             <div class="rs-recent-header">
               <h3>All Sales</h3>
-              <span class="rs-total-badge">${allSales.length} sales &middot; ${totalRevenue.toFixed(2)} EUR</span>
+              <span class="rs-total-badge" id="rs-total-badge">${allSales.length} sales &middot; ${totalRevenue.toFixed(2)} EUR</span>
             </div>
             <div id="rs-list"></div>
             <div id="rs-pagination" style="display:flex;justify-content:center;gap:12px;padding:16px 0"></div>
@@ -1685,11 +1685,25 @@
       try {
         const res = await fetch('/api/sales/' + encodeURIComponent(saleId), { method: 'DELETE' });
         if (!res.ok && res.status !== 204) throw new Error('HTTP ' + res.status);
-        const row = document.getElementById('rs-row-' + saleId);
-        if (row) { row.style.opacity = '0'; setTimeout(() => row.remove(), 300); }
+        // Remove from local cache immediately
+        if (window._rsSalesData) {
+          window._rsSalesData = window._rsSalesData.filter(s => String(s.sale_id) !== String(saleId));
+        }
+        // Update the today counter and total badge
+        const allSales = window._rsSalesData || [];
+        const today = new Date().toISOString().slice(0, 10);
+        const todaySales = allSales.filter(s => s.sold_at && s.sold_at.startsWith(today));
+        const todayRev = todaySales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
+        const totalRevenue = allSales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
+        const cntEl = document.getElementById("rs-today-count");
+        const revEl = document.getElementById("rs-today-rev");
+        const badgeEl = document.getElementById("rs-total-badge");
+        if (cntEl) cntEl.textContent = todaySales.length;
+        if (revEl) revEl.textContent = todayRev.toFixed(2) + " EUR";
+        if (badgeEl) badgeEl.textContent = allSales.length + " sales \u00b7 " + totalRevenue.toFixed(2) + " EUR";
+        // Re-render list from updated cache
+        rsRenderSalesList();
         rsToast('Sale deleted', true);
-        // Refresh list and counter after short delay
-        setTimeout(() => { rsRenderSalesList(); renderRecordSale(document.getElementById('page-content')); }, 500);
       } catch (e) {
         btn.textContent = '✕';
         btn.classList.remove('armed');

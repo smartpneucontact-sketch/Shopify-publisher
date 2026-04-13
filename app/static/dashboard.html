@@ -1407,10 +1407,16 @@
             </div>
 
             <div class="rs-field">
+              <label>Date</label>
+              <input type="date" id="rs-date" class="rs-date-input">
+            </div>
+
+            <div class="rs-field">
               <label>Channel</label>
-              <input type="hidden" id="rs-channel" value="cash">
+              <input type="hidden" id="rs-channel" value="cash_de">
               <div class="rs-pills" id="rs-pills">
-                <button type="button" class="rs-pill active" data-ch="cash" onclick="rsPickChannel(this)">Cash</button>
+                <button type="button" class="rs-pill active" data-ch="cash_de" onclick="rsPickChannel(this)">Cash DE</button>
+                <button type="button" class="rs-pill" data-ch="cash_fr" onclick="rsPickChannel(this)">Cash FR</button>
                 <button type="button" class="rs-pill" data-ch="leboncoin" onclick="rsPickChannel(this)">Leboncoin</button>
                 <button type="button" class="rs-pill" data-ch="ebay_kleinanzeigen" onclick="rsPickChannel(this)">Kleinanzeigen</button>
               </div>
@@ -1559,6 +1565,13 @@
           }
           .rs-search:focus { outline: none; border-color: var(--accent); }
           .rs-search::placeholder { color: var(--text-tertiary); }
+          .rs-date-input {
+            padding: 14px; background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 10px; color: var(--text-primary); font-size: 16px;
+            font-family: 'JetBrains Mono', monospace; -webkit-appearance: none;
+            width: 100%; box-sizing: border-box;
+          }
+          .rs-date-input:focus { outline: none; border-color: var(--accent); }
 
           .rs-sale-row {
             padding: 10px 0; border-bottom: 1px solid var(--border-subtle);
@@ -1607,6 +1620,10 @@
         </style>
       `;
 
+      // Set default date to today
+      const dateInput = document.getElementById("rs-date");
+      if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+
       // Render first page of sales
       window._rsSalesData = allSales;
       rsRenderSalesList();
@@ -1625,10 +1642,17 @@
     }
 
     function rsChColor(ch) {
-      return ch === "cash" ? "#22c55e" : ch === "ebay" ? "#e53238" : ch === "leboncoin" ? "#ff6e14" : ch === "ebay_kleinanzeigen" ? "#86b817" : "var(--accent)";
+      if (ch === "cash" || ch === "cash_de" || ch === "cash_fr") return "#22c55e";
+      if (ch === "ebay") return "#e53238";
+      if (ch === "leboncoin") return "#ff6e14";
+      if (ch === "ebay_kleinanzeigen") return "#86b817";
+      return "var(--accent)";
     }
     function rsChLabel(ch) {
-      return ch === "ebay_kleinanzeigen" ? "KA" : (ch || "—").toUpperCase();
+      if (ch === "cash_de") return "CASH DE";
+      if (ch === "cash_fr") return "CASH FR";
+      if (ch === "ebay_kleinanzeigen") return "KA";
+      return (ch || "—").toUpperCase();
     }
 
     function rsShopifyBadge(sku) {
@@ -1814,6 +1838,7 @@
       const channel = document.getElementById("rs-channel").value;
       const customer = document.getElementById("rs-customer").value.trim();
       const notes = document.getElementById("rs-notes").value.trim();
+      const saleDate = document.getElementById("rs-date").value;
       const btn = document.getElementById("rs-submit-btn");
 
       if (!noSku && !sku) { rsToast("SKU is required (or check No SKU)", false); return; }
@@ -1831,14 +1856,22 @@
       btn.disabled = true;
       btn.textContent = "Saving...";
       try {
+        const soldAt = saleDate ? new Date(saleDate + "T12:00:00").toISOString() : null;
         await apiPost("/api/sales/", {
           sku, channel, sale_price: price, quantity: 1,
           customer_name: customer || null,
-          notes: notes || (noSku ? "No SKU sale" : "Recorded from dashboard")
+          notes: notes || (noSku ? "No SKU sale" : "Recorded from dashboard"),
+          sold_at: soldAt
         });
         const label = noSku ? "No-SKU sale" : ("SKU " + sku);
         rsToast("Sale recorded: " + label + " — " + price.toFixed(2) + " EUR", true);
         document.getElementById("rs-form").reset();
+        // Reset date to today
+        document.getElementById("rs-date").value = new Date().toISOString().slice(0, 10);
+        // Reset channel to cash_de
+        document.getElementById("rs-channel").value = "cash_de";
+        document.querySelectorAll('#rs-pills .rs-pill').forEach(p => p.classList.remove('active'));
+        document.querySelector('#rs-pills .rs-pill[data-ch="cash_de"]').classList.add('active');
         // Reset no-sku state
         document.getElementById("rs-sku-field").style.opacity = "1";
         document.getElementById("rs-sku").disabled = false;

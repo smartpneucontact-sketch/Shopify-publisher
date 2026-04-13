@@ -36,6 +36,8 @@ class SalesChannel(str, Enum):
     EBAY_KLEINANZEIGEN = "ebay_kleinanzeigen"
     LEBONCOIN = "leboncoin"
     CASH = "cash"
+    CASH_DE = "cash_de"
+    CASH_FR = "cash_fr"
 
 
 class SaleRequest(BaseModel):

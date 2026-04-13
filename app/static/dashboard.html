@@ -1609,7 +1609,7 @@
       // Render first page of sales
       window._rsSalesData = allSales;
       rsRenderSalesList();
-      rsRenderEbaySalesList();
+      rsLoadEbaySold();
       // Fetch Shopify statuses + Shopify-sold list in background
       rsLoadShopifyStatuses();
       rsLoadShopifySold();
@@ -1785,7 +1785,7 @@
         if (badgeEl) badgeEl.textContent = allSales.length + " sales \u00b7 " + totalRevenue.toFixed(2) + " EUR";
         // Re-render lists from updated cache
         rsRenderSalesList();
-        rsRenderEbaySalesList();
+        rsLoadEbaySold();
         rsLoadShopifySold();
         rsToast('Sale deleted', true);
       } catch (e) {
@@ -1861,7 +1861,7 @@
             if (badgeEl) badgeEl.textContent = allSales.length + " sales \u00b7 " + totalRevenue.toFixed(2) + " EUR";
             rsPageOffset = 0;
             rsRenderSalesList();
-            rsRenderEbaySalesList();
+            rsLoadEbaySold();
             rsLoadShopifyStatuses();
             rsLoadShopifySold();
           } catch(e) { console.error("Failed to refresh sales list:", e); }
@@ -1965,40 +1965,44 @@
       `).join("");
     }
 
-    // ── List 3: eBay Sales ──────────────────────────────────────────
+    // ── List 3: eBay Sales (sold/ended from eBay API) ──────────────
+    async function rsLoadEbaySold() {
+      try {
+        const res = await apiFetch("/api/ebay/listings");
+        const listings = (res.listings || []).filter(l => l.ebay_status === 'ENDED');
+        window._rsEbaySoldData = listings;
+        rsLoadEbaySold();
+      } catch(e) {
+        const el = document.getElementById("rs-ebay-list");
+        if (el) el.innerHTML = '<div class="rs-empty">Could not load eBay data</div>';
+      }
+    }
+
     function rsRenderEbaySalesList() {
-      const allSales = window._rsSalesData || [];
-      const ebaySales = allSales.filter(s => s.channel === 'ebay' || s.channel === 'ebay_kleinanzeigen');
+      const listings = window._rsEbaySoldData || [];
       const listEl = document.getElementById("rs-ebay-list");
       const badgeEl = document.getElementById("rs-ebay-badge");
       if (!listEl) return;
+      if (badgeEl) badgeEl.textContent = listings.length + " sold";
 
-      const ebayRevenue = ebaySales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
-      if (badgeEl) badgeEl.textContent = ebaySales.length + " sale" + (ebaySales.length !== 1 ? "s" : "") + " · " + ebayRevenue.toFixed(2) + " EUR";
-
-      if (ebaySales.length === 0) {
-        listEl.innerHTML = '<div class="rs-empty">No eBay sales recorded</div>';
+      if (listings.length === 0) {
+        listEl.innerHTML = '<div class="rs-empty">No eBay sold items</div>';
         return;
       }
 
-      listEl.innerHTML = ebaySales.map(s => {
-        const hasBottom = (s.customer_name) || (s.notes && s.notes !== 'Recorded from dashboard');
-        return `
-        <div class="rs-sale-row" id="rs-ebay-row-${s.sale_id}">
-          <div class="rs-sale-top">
-            <span class="rs-sale-sku">${s.sku || '—'}</span>
-            <span class="rs-sale-ch" style="color:${rsChColor(s.channel)}">${rsChLabel(s.channel)}</span>
-            ${rsShopifyBadge(s.sku)}
-            <span class="rs-sale-price">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</span>
-            <span class="rs-sale-date">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) + ' à ' + new Date(s.sold_at).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : ''}</span>
-            <button class="rs-del-btn" onclick="rsDeleteSale('${s.sale_id}', this)" title="Delete">✕</button>
+      listEl.innerHTML = listings.map(l => `
+        <div class="rs-sale-row">
+          <div class="rs-sale-line1">
+            <span class="rs-sale-sku">${l.sku || '—'}</span>
+            <span style="font-size:12px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px">${l.title || ''}</span>
           </div>
-          ${hasBottom ? '<div class="rs-sale-bottom">' +
-            (s.customer_name ? '<span class="rs-sale-customer">' + s.customer_name + '</span>' : '') +
-            (s.notes && s.notes !== 'Recorded from dashboard' ? '<span class="rs-sale-notes">' + s.notes + '</span>' : '') +
-          '</div>' : ''}
-        </div>`;
-      }).join("");
+          <div class="rs-sale-line2">
+            <span class="rs-sale-ch" style="color:#e53238">EBAY</span>
+            <span class="rs-shopify-badge" style="background:rgba(229,50,56,0.15);color:#e53238">SOLD</span>
+            ${l.ebay_url ? '<a href="' + l.ebay_url + '" target="_blank" style="font-size:10px;color:var(--accent)">#' + (l.listing_id || 'link') + '</a>' : ''}
+          </div>
+        </div>
+      `).join("");
     }
 
     async function renderCustomers(el) {

@@ -1967,20 +1967,29 @@
 
     // ── List 3: eBay Sales (sold/ended from eBay API) ──────────────
     async function rsLoadEbaySold() {
+      // Try to reuse already-loaded product data from eBay tab
+      if (state.products && state.products.length) {
+        const sold = [];
+        state.products.forEach(p => {
+          const ebay = getEbayMeta(p);
+          if (ebay && ebay.ebay_status === 'ENDED') {
+            const sku = (p.variants || [{}])[0]?.sku || '—';
+            sold.push({ sku, title: p.title || '', listing_id: ebay.listing_id, ebay_url: ebay.ebay_url || '' });
+          }
+        });
+        window._rsEbaySoldData = sold;
+        rsRenderEbaySalesList();
+        return;
+      }
+      // Fallback: load from API
+      const el = document.getElementById("rs-ebay-list");
+      if (el) el.innerHTML = '<div class="rs-empty" style="font-size:12px">Loading eBay data…</div>';
       try {
-        const res = await apiFetch("/api/sales/ebay-sold");
-        window._rsEbaySoldData = res.products || [];
+        const res = await apiFetch("/api/ebay/listings");
+        window._rsEbaySoldData = (res.listings || []).filter(l => l.ebay_status === 'ENDED');
         rsRenderEbaySalesList();
       } catch(e) {
-        // Fallback: try eBay listings endpoint
-        try {
-          const res2 = await apiFetch("/api/ebay/listings");
-          window._rsEbaySoldData = (res2.listings || []).filter(l => l.ebay_status === 'ENDED');
-          rsRenderEbaySalesList();
-        } catch(e2) {
-          const el = document.getElementById("rs-ebay-list");
-          if (el) el.innerHTML = '<div class="rs-empty">Could not load eBay data</div>';
-        }
+        if (el) el.innerHTML = '<div class="rs-empty">Could not load eBay data</div>';
       }
     }
 

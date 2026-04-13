@@ -721,12 +721,15 @@ async def get_shopify_statuses():
         return {"statuses": {}}
 
     try:
-        products = await shopify_client.get_all_products()
+        products = await shopify_client.get_products_with_metafields()
     except Exception:
         products = []
 
     # Get locally tracked unlisted SKUs
-    unlisted_set = await sales_db.get_unlisted_skus()
+    try:
+        unlisted_set = await sales_db.get_unlisted_skus()
+    except Exception:
+        unlisted_set = set()
 
     result = {}
     for p in products:

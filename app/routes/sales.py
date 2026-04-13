@@ -565,18 +565,24 @@ async def delete_sale(sale_id: str):
     and was never sold on Shopify, set the Shopify product to draft.
     """
     try:
+        # Cast to int — DB uses integer IDs
+        try:
+            sid = int(sale_id)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Invalid sale ID")
+
         # Fetch the sale first so we know the SKU
         import aiosqlite
         from app.config import settings
         sku_to_check = None
         async with aiosqlite.connect(settings.SALES_DB_PATH) as db:
             db.row_factory = aiosqlite.Row
-            cur = await db.execute("SELECT sku, channel FROM sales WHERE id = ?", (sale_id,))
+            cur = await db.execute("SELECT sku, channel FROM sales WHERE id = ?", (sid,))
             row = await cur.fetchone()
             if row:
                 sku_to_check = dict(row).get("sku")
 
-        success = await sales_db.delete_sale(sale_id)
+        success = await sales_db.delete_sale(sid)
         if not success:
             raise HTTPException(status_code=404, detail=f"Sale with ID {sale_id} not found")
 

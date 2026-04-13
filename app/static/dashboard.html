@@ -1683,7 +1683,7 @@
       clearTimeout(_delTimer);
       btn.textContent = '…';
       try {
-        const res = await fetch('/api/sales/' + saleId, { method: 'DELETE' });
+        const res = await fetch('/api/sales/' + encodeURIComponent(saleId), { method: 'DELETE' });
         if (!res.ok && res.status !== 204) throw new Error('HTTP ' + res.status);
         const row = document.getElementById('rs-row-' + saleId);
         if (row) { row.style.opacity = '0'; setTimeout(() => row.remove(), 300); }

@@ -1408,7 +1408,11 @@
 
             <div class="rs-field">
               <label>Date</label>
-              <input type="date" id="rs-date" class="rs-date-input">
+              <div class="rs-date-row">
+                <select id="rs-day" class="rs-date-sel"></select>
+                <select id="rs-month" class="rs-date-sel"></select>
+                <select id="rs-year" class="rs-date-sel"></select>
+              </div>
             </div>
 
             <div class="rs-field">
@@ -1565,13 +1569,14 @@
           }
           .rs-search:focus { outline: none; border-color: var(--accent); }
           .rs-search::placeholder { color: var(--text-tertiary); }
-          .rs-date-input {
-            padding: 14px; background: var(--bg-secondary); border: 1px solid var(--border);
-            border-radius: 10px; color: var(--text-primary); font-size: 16px;
+          .rs-date-row { display: flex; gap: 8px; }
+          .rs-date-sel {
+            flex: 1; padding: 14px 8px; background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 10px; color: var(--text-primary); font-size: 15px;
             font-family: 'JetBrains Mono', monospace; -webkit-appearance: none;
-            width: 100%; box-sizing: border-box;
+            appearance: none; text-align: center; cursor: pointer;
           }
-          .rs-date-input:focus { outline: none; border-color: var(--accent); }
+          .rs-date-sel:focus { outline: none; border-color: var(--accent); }
 
           .rs-sale-row {
             padding: 10px 0; border-bottom: 1px solid var(--border-subtle);
@@ -1620,9 +1625,8 @@
         </style>
       `;
 
-      // Set default date to today
-      const dateInput = document.getElementById("rs-date");
-      if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+      // Populate date selectors with today's date
+      rsInitDateSelectors();
 
       // Render first page of sales
       window._rsSalesData = allSales;
@@ -1669,6 +1673,65 @@
       else if (st === 'archived') { label = 'archived'; }
       else if (st === 'not_found') { label = 'not on shopify'; }
       return '<span class="rs-shopify-badge ' + cls + '">' + label + '</span>';
+    }
+
+    const RS_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    function rsInitDateSelectors() {
+      const now = new Date();
+      const dayEl = document.getElementById('rs-day');
+      const monthEl = document.getElementById('rs-month');
+      const yearEl = document.getElementById('rs-year');
+      if (!dayEl || !monthEl || !yearEl) return;
+
+      // Days 1-31
+      dayEl.innerHTML = '';
+      for (let d = 1; d <= 31; d++) {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = String(d).padStart(2, '0');
+        dayEl.appendChild(opt);
+      }
+      dayEl.value = now.getDate();
+
+      // Months
+      monthEl.innerHTML = '';
+      RS_MONTHS.forEach((m, i) => {
+        const opt = document.createElement('option');
+        opt.value = i + 1;
+        opt.textContent = m;
+        monthEl.appendChild(opt);
+      });
+      monthEl.value = now.getMonth() + 1;
+
+      // Years (current year and previous)
+      yearEl.innerHTML = '';
+      const curYear = now.getFullYear();
+      for (let y = curYear; y >= curYear - 2; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        yearEl.appendChild(opt);
+      }
+      yearEl.value = curYear;
+    }
+
+    function rsGetSelectedDate() {
+      const d = document.getElementById('rs-day')?.value;
+      const m = document.getElementById('rs-month')?.value;
+      const y = document.getElementById('rs-year')?.value;
+      if (!d || !m || !y) return null;
+      return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    }
+
+    function rsResetDateToToday() {
+      const now = new Date();
+      const dayEl = document.getElementById('rs-day');
+      const monthEl = document.getElementById('rs-month');
+      const yearEl = document.getElementById('rs-year');
+      if (dayEl) dayEl.value = now.getDate();
+      if (monthEl) monthEl.value = now.getMonth() + 1;
+      if (yearEl) yearEl.value = now.getFullYear();
     }
 
     function rsGetFilteredSales() {
@@ -1838,7 +1901,7 @@
       const channel = document.getElementById("rs-channel").value;
       const customer = document.getElementById("rs-customer").value.trim();
       const notes = document.getElementById("rs-notes").value.trim();
-      const saleDate = document.getElementById("rs-date").value;
+      const saleDate = rsGetSelectedDate();
       const btn = document.getElementById("rs-submit-btn");
 
       if (!noSku && !sku) { rsToast("SKU is required (or check No SKU)", false); return; }
@@ -1867,7 +1930,7 @@
         rsToast("Sale recorded: " + label + " — " + price.toFixed(2) + " EUR", true);
         document.getElementById("rs-form").reset();
         // Reset date to today
-        document.getElementById("rs-date").value = new Date().toISOString().slice(0, 10);
+        rsResetDateToToday();
         // Reset channel to cash_de
         document.getElementById("rs-channel").value = "cash_de";
         document.querySelectorAll('#rs-pills .rs-pill').forEach(p => p.classList.remove('active'));

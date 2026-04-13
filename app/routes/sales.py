@@ -835,6 +835,40 @@ async def get_shopify_sold():
     return {"products": shopify_sold, "count": len(shopify_sold)}
 
 
+@router.get("/ebay-sold")
+async def get_ebay_sold():
+    """
+    Return products with eBay status = ENDED (sold on eBay).
+    Uses GraphQL to read metafields.
+    """
+    try:
+        products = await shopify_client.get_products_with_metafields()
+    except Exception:
+        products = []
+
+    ebay_sold = []
+    for p in products:
+        ebay_mf = {}
+        sku = None
+        for mf in p.get("metafields", []):
+            if mf.get("namespace") == "ebay":
+                ebay_mf[mf["key"]] = mf.get("value", "")
+        for v in p.get("variants", []):
+            if v.get("sku"):
+                sku = v["sku"]
+                break
+
+        if ebay_mf.get("ebay_status") == "ENDED" and ebay_mf.get("listing_id"):
+            ebay_sold.append({
+                "sku": sku or "—",
+                "title": p.get("title", ""),
+                "listing_id": ebay_mf.get("listing_id"),
+                "ebay_url": ebay_mf.get("ebay_url", ""),
+            })
+
+    return {"products": ebay_sold, "count": len(ebay_sold)}
+
+
 @router.get("/check-sku/{sku}")
 async def check_sku_exists(sku: str):
     """Check if a SKU already has a sale recorded."""

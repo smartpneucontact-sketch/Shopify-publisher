@@ -1968,13 +1968,19 @@
     // ── List 3: eBay Sales (sold/ended from eBay API) ──────────────
     async function rsLoadEbaySold() {
       try {
-        const res = await apiFetch("/api/ebay/listings");
-        const listings = (res.listings || []).filter(l => l.ebay_status === 'ENDED');
-        window._rsEbaySoldData = listings;
-        rsLoadEbaySold();
+        const res = await apiFetch("/api/sales/ebay-sold");
+        window._rsEbaySoldData = res.products || [];
+        rsRenderEbaySalesList();
       } catch(e) {
-        const el = document.getElementById("rs-ebay-list");
-        if (el) el.innerHTML = '<div class="rs-empty">Could not load eBay data</div>';
+        // Fallback: try eBay listings endpoint
+        try {
+          const res2 = await apiFetch("/api/ebay/listings");
+          window._rsEbaySoldData = (res2.listings || []).filter(l => l.ebay_status === 'ENDED');
+          rsRenderEbaySalesList();
+        } catch(e2) {
+          const el = document.getElementById("rs-ebay-list");
+          if (el) el.innerHTML = '<div class="rs-empty">Could not load eBay data</div>';
+        }
       }
     }
 

@@ -117,6 +117,31 @@ async def record_sale(sale: SaleRequest):
                 detail="Failed to record sale in database"
             )
 
+        # Auto-sync to Shopify: set product to active + inventory 0
+        sku_val = sale_data.get("sku", "")
+        if sku_val and not sku_val.startswith("NOSSKU-"):
+            try:
+                all_products = await shopify_client.get_all_products_all_statuses()
+                for p in all_products:
+                    for v in p.get("variants", []):
+                        if v.get("sku") == sku_val:
+                            # If product is draft, activate it first
+                            if p.get("status") != "active":
+                                await shopify_client.set_product_status(p["id"], "active")
+                            # Set inventory to 0
+                            await shopify_client.set_inventory_to_zero(p["id"])
+                            # Mark eBay as ENDED
+                            try:
+                                await shopify_client.set_product_metafield(
+                                    p["id"], "ebay", "ebay_status", "ENDED"
+                                )
+                            except Exception:
+                                pass
+                            await sales_db.mark_sku_unlisted(sku_val)
+                            break
+            except Exception:
+                pass  # Best effort — don't fail the sale recording
+
         return SaleResponse(**_map_sale(result))
 
     except ValueError as e:
@@ -720,9 +745,12 @@ async def get_shopify_statuses():
     if not skus:
         return {"statuses": {}}
 
-    def _classify(p_status, inv):
+    # Get explicitly unlisted SKUs from our DB
+    unlisted_skus_set = set(await sales_db.get_unlisted_skus())
+
+    def _classify(p_status, inv, sku_val):
         """Derive effective status for a SKU in the sales list."""
-        if p_status == "draft" or (p_status == "active" and inv is not None and inv <= 0):
+        if sku_val in unlisted_skus_set:
             return "unlisted"
         return p_status
 
@@ -739,7 +767,7 @@ async def get_shopify_statuses():
             sku = v.get("sku", "")
             if sku in skus:
                 inv = v.get("inventory_quantity", v.get("inventoryQuantity", None))
-                result[sku] = {"status": _classify(p_status, inv), "inventory": inv}
+                result[sku] = {"status": _classify(p_status, inv, sku), "inventory": inv}
 
     # For any SKUs still missing, try GraphQL as fallback
     missing = skus - set(result.keys()) - {s for s in skus if s.startswith("NOSSKU-")}
@@ -752,7 +780,7 @@ async def get_shopify_statuses():
                     sku = v.get("sku", "")
                     if sku in missing:
                         inv = v.get("inventory_quantity", v.get("inventoryQuantity", None))
-                        result[sku] = {"status": _classify(p_status, inv), "inventory": inv}
+                        result[sku] = {"status": _classify(p_status, inv, sku), "inventory": inv}
         except Exception:
             pass
 
@@ -764,24 +792,47 @@ async def get_shopify_statuses():
     return {"statuses": result}
 
 
-@router.get("/debug-skus")
-async def debug_shopify_skus():
-    """Debug: list all Shopify variant SKUs across all statuses."""
+
+@router.get("/shopify-sold")
+async def get_shopify_sold():
+    """
+    Return Shopify products that are ACTIVE with stock <= 0
+    and whose SKU is NOT in the recorded sales list.
+    These are products sold directly via Shopify.
+    """
+    # Get all SKUs from sales DB
+    all_sales = await sales_db.get_sales(
+        channel=None, start_date=None, end_date=None,
+        sku=None, limit=10000, offset=0,
+    )
+    recorded_skus = set()
+    for s in all_sales:
+        sku = s.get("sku", "")
+        if sku and not sku.startswith("NOSSKU-"):
+            recorded_skus.add(sku)
+
+    # Fetch all Shopify products
     try:
         products = await shopify_client.get_all_products_all_statuses()
-        skus = []
-        for p in products:
-            for v in p.get("variants", []):
-                skus.append({
-                    "sku": v.get("sku", ""),
-                    "product_title": p.get("title", ""),
-                    "status": p.get("status", ""),
-                    "inventory": v.get("inventory_quantity"),
+    except Exception:
+        products = []
+
+    shopify_sold = []
+    for p in products:
+        if p.get("status") != "active":
+            continue
+        for v in p.get("variants", []):
+            sku = v.get("sku", "")
+            inv = v.get("inventory_quantity", None)
+            if sku and inv is not None and inv <= 0 and sku not in recorded_skus:
+                shopify_sold.append({
+                    "sku": sku,
+                    "title": p.get("title", ""),
                     "product_id": p.get("id"),
+                    "inventory": inv,
                 })
-        return {"count": len(skus), "skus": skus}
-    except Exception as e:
-        return {"error": str(e)}
+
+    return {"products": shopify_sold, "count": len(shopify_sold)}
 
 
 @router.get("/check-sku/{sku}")

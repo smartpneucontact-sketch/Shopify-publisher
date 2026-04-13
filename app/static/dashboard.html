@@ -1434,11 +1434,27 @@
 
           <div class="rs-recent">
             <div class="rs-recent-header">
-              <h3>All Sales</h3>
+              <h3>Recorded Sales</h3>
               <span class="rs-total-badge" id="rs-total-badge">${allSales.length} sales &middot; ${totalRevenue.toFixed(2)} EUR</span>
             </div>
             <div id="rs-list"></div>
             <div id="rs-pagination" style="display:flex;justify-content:center;gap:12px;padding:16px 0"></div>
+          </div>
+
+          <div class="rs-recent" id="rs-shopify-sold-section">
+            <div class="rs-recent-header">
+              <h3>Sold on Shopify</h3>
+              <span class="rs-total-badge" id="rs-shopify-sold-badge">loading…</span>
+            </div>
+            <div id="rs-shopify-sold-list"><div class="rs-empty">Loading…</div></div>
+          </div>
+
+          <div class="rs-recent" id="rs-ebay-section">
+            <div class="rs-recent-header">
+              <h3>eBay Sales</h3>
+              <span class="rs-total-badge" id="rs-ebay-badge">0</span>
+            </div>
+            <div id="rs-ebay-list"></div>
           </div>
         </div>
 
@@ -1553,6 +1569,7 @@
           .rs-shopify-badge.not_found { background: rgba(239,68,68,0.15); color: #ef4444; }
           .rs-shopify-badge.zeroed { background: rgba(239,68,68,0.15); color: #ef4444; }
           .rs-shopify-badge.unlisted { background: rgba(168,85,247,0.15); color: #a855f7; }
+          .rs-shopify-badge.shopify-sold { background: rgba(59,130,246,0.15); color: #3b82f6; }
           .rs-del-btn {
             background: none; border: none; color: var(--text-tertiary); font-size: 16px;
             padding: 4px 6px; cursor: pointer; flex-shrink: 0; opacity: 0.5;
@@ -1578,8 +1595,10 @@
       // Render first page of sales
       window._rsSalesData = allSales;
       rsRenderSalesList();
-      // Fetch Shopify statuses in background
+      rsRenderEbaySalesList();
+      // Fetch Shopify statuses + Shopify-sold list in background
       rsLoadShopifyStatuses();
+      rsLoadShopifySold();
     }
 
     async function rsLoadShopifyStatuses() {
@@ -1605,7 +1624,7 @@
       let label = st;
       let cls = st;
       if (st === 'unlisted') { label = 'unlisted'; cls = 'unlisted'; }
-      else if (st === 'active' && info.inventory === 0) { label = 'stock 0'; cls = 'zeroed'; }
+      else if (st === 'active' && info.inventory !== null && info.inventory <= 0) { label = 'active · stock 0'; cls = 'unlisted'; }
       else if (st === 'active') { label = 'active'; }
       else if (st === 'draft') { label = 'draft'; }
       else if (st === 'archived') { label = 'archived'; }
@@ -1738,8 +1757,10 @@
         if (cntEl) cntEl.textContent = todaySales.length;
         if (revEl) revEl.textContent = todayRev.toFixed(2) + " EUR";
         if (badgeEl) badgeEl.textContent = allSales.length + " sales \u00b7 " + totalRevenue.toFixed(2) + " EUR";
-        // Re-render list from updated cache
+        // Re-render lists from updated cache
         rsRenderSalesList();
+        rsRenderEbaySalesList();
+        rsLoadShopifySold();
         rsToast('Sale deleted', true);
       } catch (e) {
         btn.textContent = '✕';
@@ -1814,7 +1835,9 @@
             if (badgeEl) badgeEl.textContent = allSales.length + " sales \u00b7 " + totalRevenue.toFixed(2) + " EUR";
             rsPageOffset = 0;
             rsRenderSalesList();
+            rsRenderEbaySalesList();
             rsLoadShopifyStatuses();
+            rsLoadShopifySold();
           } catch(e) { console.error("Failed to refresh sales list:", e); }
           document.getElementById("rs-sku").focus();
         }, 800);
@@ -1870,11 +1893,86 @@
         let msg = synced + " SKU" + (synced !== 1 ? "s" : "") + " unlisted on Shopify";
         if (notFound) msg += " (" + notFound + " not found)";
         rsToast(msg, true);
+        rsLoadShopifyStatuses();
+        rsLoadShopifySold();
       } catch (e) {
         rsToast("Sync error: " + e.message, false);
       } finally {
         btn.textContent = SYNC_LABEL;
       }
+    }
+
+    // ── List 2: Sold on Shopify (active, stock 0, not in recorded sales) ──
+    async function rsLoadShopifySold() {
+      try {
+        const res = await apiFetch("/api/sales/shopify-sold");
+        const products = res.products || [];
+        window._rsShopifySoldData = products;
+        rsRenderShopifySoldList();
+      } catch(e) {
+        const el = document.getElementById("rs-shopify-sold-list");
+        if (el) el.innerHTML = '<div class="rs-empty">Could not load</div>';
+      }
+    }
+
+    function rsRenderShopifySoldList() {
+      const products = window._rsShopifySoldData || [];
+      const listEl = document.getElementById("rs-shopify-sold-list");
+      const badgeEl = document.getElementById("rs-shopify-sold-badge");
+      if (!listEl) return;
+      if (badgeEl) badgeEl.textContent = products.length + " product" + (products.length !== 1 ? "s" : "");
+
+      if (products.length === 0) {
+        listEl.innerHTML = '<div class="rs-empty">No Shopify-sold products found</div>';
+        return;
+      }
+
+      listEl.innerHTML = products.map(p => `
+        <div class="rs-sale-row">
+          <div class="rs-sale-top">
+            <span class="rs-sale-sku">${p.sku}</span>
+            <span class="rs-shopify-badge active">shopify</span>
+            <span style="font-size:12px;color:var(--text-secondary);margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title || ''}</span>
+            <span class="rs-sale-price" style="margin-left:auto">stock ${p.inventory}</span>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    // ── List 3: eBay Sales ──────────────────────────────────────────
+    function rsRenderEbaySalesList() {
+      const allSales = window._rsSalesData || [];
+      const ebaySales = allSales.filter(s => s.channel === 'ebay' || s.channel === 'ebay_kleinanzeigen');
+      const listEl = document.getElementById("rs-ebay-list");
+      const badgeEl = document.getElementById("rs-ebay-badge");
+      if (!listEl) return;
+
+      const ebayRevenue = ebaySales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
+      if (badgeEl) badgeEl.textContent = ebaySales.length + " sale" + (ebaySales.length !== 1 ? "s" : "") + " · " + ebayRevenue.toFixed(2) + " EUR";
+
+      if (ebaySales.length === 0) {
+        listEl.innerHTML = '<div class="rs-empty">No eBay sales recorded</div>';
+        return;
+      }
+
+      listEl.innerHTML = ebaySales.map(s => {
+        const hasBottom = (s.customer_name) || (s.notes && s.notes !== 'Recorded from dashboard');
+        return `
+        <div class="rs-sale-row" id="rs-ebay-row-${s.sale_id}">
+          <div class="rs-sale-top">
+            <span class="rs-sale-sku">${s.sku || '—'}</span>
+            <span class="rs-sale-ch" style="color:${rsChColor(s.channel)}">${rsChLabel(s.channel)}</span>
+            ${rsShopifyBadge(s.sku)}
+            <span class="rs-sale-price">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</span>
+            <span class="rs-sale-date">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) + ' à ' + new Date(s.sold_at).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : ''}</span>
+            <button class="rs-del-btn" onclick="rsDeleteSale('${s.sale_id}', this)" title="Delete">✕</button>
+          </div>
+          ${hasBottom ? '<div class="rs-sale-bottom">' +
+            (s.customer_name ? '<span class="rs-sale-customer">' + s.customer_name + '</span>' : '') +
+            (s.notes && s.notes !== 'Recorded from dashboard' ? '<span class="rs-sale-notes">' + s.notes + '</span>' : '') +
+          '</div>' : ''}
+        </div>`;
+      }).join("");
     }
 
     async function renderCustomers(el) {

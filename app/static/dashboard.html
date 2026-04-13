@@ -1432,12 +1432,13 @@
 
           <div id="rs-toast" class="rs-toast"></div>
 
+          <input type="text" id="rs-search" class="rs-search" placeholder="Search SKU…" inputmode="numeric" oninput="rsOnSearch(this)">
+
           <div class="rs-recent">
             <div class="rs-recent-header">
               <h3>Recorded Sales</h3>
               <span class="rs-total-badge" id="rs-total-badge">${allSales.length} sales &middot; ${totalRevenue.toFixed(2)} EUR</span>
             </div>
-            <input type="text" id="rs-search" class="rs-search" placeholder="Search SKU…" inputmode="numeric" oninput="rsOnSearch(this)">
             <div id="rs-list"></div>
             <div id="rs-pagination" style="display:flex;justify-content:center;gap:12px;padding:16px 0"></div>
           </div>
@@ -1554,7 +1555,7 @@
             background: var(--bg-secondary); border: 1px solid var(--border);
             border-radius: 10px; color: var(--text-primary); font-size: 15px;
             font-family: 'JetBrains Mono', monospace;
-            margin-bottom: 10px; -webkit-appearance: none;
+            margin: 20px 0 4px; -webkit-appearance: none;
           }
           .rs-search:focus { outline: none; border-color: var(--accent); }
           .rs-search::placeholder { color: var(--text-tertiary); }
@@ -1657,6 +1658,8 @@
       window._rsSearchQuery = input.value;
       rsPageOffset = 0;
       rsRenderSalesList();
+      rsRenderShopifySoldList();
+      rsRenderEbaySalesList();
     }
 
     function rsRenderSalesList() {
@@ -1942,20 +1945,22 @@
     }
 
     function rsRenderShopifySoldList() {
-      const products = window._rsShopifySoldData || [];
+      const all = window._rsShopifySoldData || [];
+      const q = (window._rsSearchQuery || '').trim().toLowerCase();
+      const products = q ? all.filter(p => (p.sku || '').toLowerCase().includes(q)) : all;
       const listEl = document.getElementById("rs-shopify-sold-list");
       const badgeEl = document.getElementById("rs-shopify-sold-badge");
       if (!listEl) return;
       if (badgeEl) badgeEl.textContent = products.length + " product" + (products.length !== 1 ? "s" : "");
 
       if (products.length === 0) {
-        listEl.innerHTML = '<div class="rs-empty">No Shopify-sold products found</div>';
+        listEl.innerHTML = '<div class="rs-empty">' + (q ? 'No match' : 'No Shopify-sold products found') + '</div>';
         return;
       }
 
       listEl.innerHTML = products.map(p => `
         <div class="rs-sale-row">
-          <div class="rs-sale-top">
+          <div class="rs-sale-line1">
             <span class="rs-sale-sku">${p.sku}</span>
             <span class="rs-shopify-badge active">shopify</span>
             <span style="font-size:12px;color:var(--text-secondary);margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title || ''}</span>
@@ -1994,14 +1999,16 @@
     }
 
     function rsRenderEbaySalesList() {
-      const listings = window._rsEbaySoldData || [];
+      const all = window._rsEbaySoldData || [];
+      const q = (window._rsSearchQuery || '').trim().toLowerCase();
+      const listings = q ? all.filter(l => (l.sku || '').toLowerCase().includes(q)) : all;
       const listEl = document.getElementById("rs-ebay-list");
       const badgeEl = document.getElementById("rs-ebay-badge");
       if (!listEl) return;
       if (badgeEl) badgeEl.textContent = listings.length + " sold";
 
       if (listings.length === 0) {
-        listEl.innerHTML = '<div class="rs-empty">No eBay sold items</div>';
+        listEl.innerHTML = '<div class="rs-empty">' + (q ? 'No match' : 'No eBay sold items') + '</div>';
         return;
       }
 

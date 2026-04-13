@@ -603,6 +603,13 @@ async def delete_sale(sale_id: str):
                             for v in p.get("variants", []):
                                 if v.get("sku") == sku_to_check:
                                     await shopify_client.set_product_status(p["id"], "draft")
+                                    # Clear the unlisted metafield
+                                    try:
+                                        await shopify_client.set_product_metafield(
+                                            p["id"], "smartpneu", "sale_unlisted", ""
+                                        )
+                                    except Exception:
+                                        pass
                                     break
                     except Exception:
                         pass  # Best effort — don't fail the delete
@@ -635,6 +642,12 @@ async def sync_sale_to_shopify(body: SyncShopifyRequest):
                 try:
                     await shopify_client.set_product_metafield(
                         p["id"], "ebay", "ebay_status", "ENDED"
+                    )
+                except Exception:
+                    pass
+                try:
+                    await shopify_client.set_product_metafield(
+                        p["id"], "smartpneu", "sale_unlisted", "true"
                     )
                 except Exception:
                     pass
@@ -685,6 +698,12 @@ async def sync_all_sales_to_shopify():
                 )
             except Exception:
                 pass
+            try:
+                await shopify_client.set_product_metafield(
+                    product["id"], "smartpneu", "sale_unlisted", "true"
+                )
+            except Exception:
+                pass
             synced.append(sku)
         except Exception as e:
             errors.append({"sku": sku, "error": str(e)})
@@ -725,11 +744,18 @@ async def get_shopify_statuses():
     result = {}
     for p in products:
         p_status = p.get("status", "unknown")
+        # Check for unlisted metafield
+        is_unlisted = False
+        for mf in p.get("metafields", []):
+            if mf.get("namespace") == "smartpneu" and mf.get("key") == "sale_unlisted" and mf.get("value") == "true":
+                is_unlisted = True
+                break
         for v in p.get("variants", []):
             sku = v.get("sku", "")
             if sku in skus:
                 inv = v.get("inventoryQuantity", v.get("inventory_quantity", None))
-                result[sku] = {"status": p_status, "inventory": inv}
+                effective_status = "unlisted" if is_unlisted else p_status
+                result[sku] = {"status": effective_status, "inventory": inv}
 
     # Mark SKUs not found in Shopify
     for sku in skus:

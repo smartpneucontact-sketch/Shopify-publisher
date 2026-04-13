@@ -721,7 +721,7 @@ async def get_shopify_statuses():
         return {"statuses": {}}
 
     try:
-        products = await shopify_client.get_products_with_metafields()
+        products = await shopify_client.get_all_products_all_statuses()
     except Exception:
         products = []
 

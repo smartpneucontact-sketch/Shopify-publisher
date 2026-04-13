@@ -222,6 +222,30 @@ class ShopifyAdminClient:
             results.append(r)
         return results
 
+    async def get_all_products_all_statuses(self) -> list:
+        """Fetch ALL products across active, draft, and archived statuses."""
+        all_products = []
+        for status in ["active", "draft", "archived"]:
+            since_id = 0
+            async with httpx.AsyncClient(timeout=120, headers=self.headers) as client:
+                while True:
+                    resp = await client.get(
+                        f"{self.base_url}/products.json",
+                        params={"limit": 250, "since_id": since_id, "status": status},
+                    )
+                    resp.raise_for_status()
+                    batch = resp.json().get("products", [])
+                    if not batch:
+                        break
+                    # Tag each product with its status
+                    for p in batch:
+                        p["status"] = status
+                    all_products.extend(batch)
+                    since_id = batch[-1]["id"]
+                    if len(batch) < 250:
+                        break
+        return all_products
+
     async def get_all_products(self) -> list:
         """Fetch ALL products using since_id pagination (250 per page)."""
         all_products = []

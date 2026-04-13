@@ -1812,6 +1812,7 @@
             if (badgeEl) badgeEl.textContent = allSales.length + " sales \u00b7 " + totalRevenue.toFixed(2) + " EUR";
             rsPageOffset = 0;
             rsRenderSalesList();
+            rsLoadShopifyStatuses();
           } catch(e) { console.error("Failed to refresh sales list:", e); }
           document.getElementById("rs-sku").focus();
         }, 800);

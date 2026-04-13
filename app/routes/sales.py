@@ -720,6 +720,13 @@ async def get_shopify_statuses():
     if not skus:
         return {"statuses": {}}
 
+    def _classify(p_status, inv):
+        """Derive effective status for a SKU in the sales list."""
+        if p_status == "draft" or (p_status == "active" and inv is not None and inv <= 0):
+            return "unlisted"
+        return p_status
+
+    # Try REST API first (separate calls per status)
     try:
         products = await shopify_client.get_all_products_all_statuses()
     except Exception:
@@ -732,23 +739,49 @@ async def get_shopify_statuses():
             sku = v.get("sku", "")
             if sku in skus:
                 inv = v.get("inventory_quantity", v.get("inventoryQuantity", None))
-                # SKU is in the sales list, so determine effective status:
-                # - active with stock > 0 → "active"
-                # - active with stock 0 → "unlisted" (sold, stock zeroed)
-                # - draft → "unlisted" (sold, set to draft)
-                # - archived → "archived"
-                if p_status == "draft" or (p_status == "active" and (inv is not None and inv <= 0)):
-                    effective_status = "unlisted"
-                else:
-                    effective_status = p_status
-                result[sku] = {"status": effective_status, "inventory": inv}
+                result[sku] = {"status": _classify(p_status, inv), "inventory": inv}
 
-    # Mark SKUs not found in Shopify
+    # For any SKUs still missing, try GraphQL as fallback
+    missing = skus - set(result.keys()) - {s for s in skus if s.startswith("NOSSKU-")}
+    if missing:
+        try:
+            gql_products = await shopify_client.get_products_with_metafields()
+            for p in gql_products:
+                p_status = p.get("status", "unknown")
+                for v in p.get("variants", []):
+                    sku = v.get("sku", "")
+                    if sku in missing:
+                        inv = v.get("inventory_quantity", v.get("inventoryQuantity", None))
+                        result[sku] = {"status": _classify(p_status, inv), "inventory": inv}
+        except Exception:
+            pass
+
+    # Mark SKUs still not found
     for sku in skus:
         if sku not in result:
             result[sku] = {"status": "not_found", "inventory": None}
 
     return {"statuses": result}
+
+
+@router.get("/debug-skus")
+async def debug_shopify_skus():
+    """Debug: list all Shopify variant SKUs across all statuses."""
+    try:
+        products = await shopify_client.get_all_products_all_statuses()
+        skus = []
+        for p in products:
+            for v in p.get("variants", []):
+                skus.append({
+                    "sku": v.get("sku", ""),
+                    "product_title": p.get("title", ""),
+                    "status": p.get("status", ""),
+                    "inventory": v.get("inventory_quantity"),
+                    "product_id": p.get("id"),
+                })
+        return {"count": len(skus), "skus": skus}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @router.get("/check-sku/{sku}")

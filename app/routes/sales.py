@@ -558,30 +558,50 @@ async def update_sale(
         raise HTTPException(status_code=500, detail=f"Error updating sale: {str(e)}")
 
 
-@router.delete("/{sale_id}", status_code=204)
+@router.delete("/{sale_id}")
 async def delete_sale(sale_id: str):
     """
-    Delete a sale record.
-
-    Path Parameters:
-        sale_id: ID of the sale to delete
-
-    Returns:
-        No content on success
-
-    Raises:
-        HTTPException: If sale not found or deletion fails
+    Delete a sale record. If the deleted SKU has no remaining sales
+    and was never sold on Shopify, set the Shopify product to draft.
     """
     try:
+        # Fetch the sale first so we know the SKU
+        import aiosqlite
+        from app.config import settings
+        sku_to_check = None
+        async with aiosqlite.connect(settings.SALES_DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT sku, channel FROM sales WHERE id = ?", (sale_id,))
+            row = await cur.fetchone()
+            if row:
+                sku_to_check = dict(row).get("sku")
+
         success = await sales_db.delete_sale(sale_id)
-
         if not success:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Sale with ID {sale_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Sale with ID {sale_id} not found")
 
-        return None
+        # Check if this SKU still has remaining sales
+        if sku_to_check and not sku_to_check.startswith("NOSSKU-"):
+            remaining = await sales_db.get_sales(
+                channel=None, start_date=None, end_date=None,
+                sku=sku_to_check, limit=1000, offset=0,
+            )
+            if not remaining:
+                # No more sales for this SKU — set Shopify product to draft
+                # (only if it was never sold via Shopify)
+                shopify_sold = any(s.get("channel") == "shopify" for s in remaining)
+                if not shopify_sold:
+                    try:
+                        all_products = await shopify_client.get_all_products()
+                        for p in all_products:
+                            for v in p.get("variants", []):
+                                if v.get("sku") == sku_to_check:
+                                    await shopify_client.set_product_status(p["id"], "draft")
+                                    break
+                    except Exception:
+                        pass  # Best effort — don't fail the delete
+
+        return {"status": "deleted", "sale_id": sale_id}
 
     except HTTPException:
         raise
@@ -590,7 +610,7 @@ async def delete_sale(sale_id: str):
 
 
 class SyncShopifyRequest(BaseModel):
-    sku: str = Field(..., description="SKU to sync (set inventory to 0 on Shopify)")
+    sku: Optional[str] = Field(default=None, description="Single SKU to sync (optional)")
 
 
 @router.post("/sync-shopify")
@@ -599,12 +619,13 @@ async def sync_sale_to_shopify(body: SyncShopifyRequest):
     Set Shopify inventory to 0 for a specific SKU after an in-person or
     marketplace sale. Also updates the eBay metafield to ENDED if present.
     """
+    if not body.sku:
+        raise HTTPException(status_code=400, detail="SKU is required")
     all_products = await shopify_client.get_all_products()
     for p in all_products:
         for v in p.get("variants", []):
             if v.get("sku") == body.sku:
                 result = await shopify_client.set_inventory_to_zero(p["id"])
-                # Mark eBay status as ENDED if this product was listed
                 try:
                     await shopify_client.set_product_metafield(
                         p["id"], "ebay", "ebay_status", "ENDED"
@@ -614,3 +635,58 @@ async def sync_sale_to_shopify(body: SyncShopifyRequest):
                 return {"status": "synced", "sku": body.sku, "result": result}
 
     raise HTTPException(status_code=404, detail=f"SKU {body.sku} not found in Shopify")
+
+
+@router.post("/sync-shopify-all")
+async def sync_all_sales_to_shopify():
+    """
+    Set Shopify inventory to 0 for ALL unique SKUs in the sales list.
+    Skips NOSSKU- entries. Also marks eBay status as ENDED.
+    """
+    all_sales = await sales_db.get_sales(
+        channel=None, start_date=None, end_date=None,
+        sku=None, limit=10000, offset=0,
+    )
+    # Collect unique real SKUs
+    skus = set()
+    for s in all_sales:
+        sku = s.get("sku", "")
+        if sku and not sku.startswith("NOSSKU-"):
+            skus.add(sku)
+
+    if not skus:
+        return {"status": "nothing_to_sync", "synced": 0}
+
+    all_products = await shopify_client.get_all_products()
+    # Build SKU → product map
+    sku_product = {}
+    for p in all_products:
+        for v in p.get("variants", []):
+            if v.get("sku") in skus:
+                sku_product[v["sku"]] = p
+
+    synced = []
+    errors = []
+    for sku in skus:
+        product = sku_product.get(sku)
+        if not product:
+            continue
+        try:
+            await shopify_client.set_inventory_to_zero(product["id"])
+            try:
+                await shopify_client.set_product_metafield(
+                    product["id"], "ebay", "ebay_status", "ENDED"
+                )
+            except Exception:
+                pass
+            synced.append(sku)
+        except Exception as e:
+            errors.append({"sku": sku, "error": str(e)})
+
+    return {
+        "status": "done",
+        "synced": len(synced),
+        "synced_skus": synced,
+        "not_found": list(skus - set(sku_product.keys())),
+        "errors": errors,
+    }

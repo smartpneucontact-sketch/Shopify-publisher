@@ -1427,7 +1427,7 @@
             </div>
 
             <button type="submit" class="rs-submit" id="rs-submit-btn">Record Sale</button>
-            <button type="button" class="rs-sync-btn" id="rs-sync-btn" onclick="rsSyncShopifyStep()">Sync to Shopify (set stock to 0)</button>
+            <button type="button" class="rs-sync-btn" id="rs-sync-btn" onclick="rsSyncShopifyStep()">Sync All to Shopify (unlist all SKUs)</button>
           </form>
 
           <div id="rs-toast" class="rs-toast"></div>
@@ -1543,6 +1543,13 @@
           .rs-sale-bottom { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
           .rs-sale-customer { font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
           .rs-sale-notes { font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .rs-del-btn {
+            background: none; border: none; color: var(--text-tertiary); font-size: 16px;
+            padding: 4px 6px; cursor: pointer; flex-shrink: 0; opacity: 0.5;
+            -webkit-tap-highlight-color: transparent; border-radius: 4px;
+          }
+          .rs-del-btn:hover, .rs-del-btn:active { opacity: 1; color: var(--danger, #e53e3e); background: rgba(229,62,62,0.1); }
+          .rs-del-btn.armed { opacity: 1; color: var(--danger, #e53e3e); background: rgba(229,62,62,0.15); }
 
           .rs-pager-btn {
             padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border);
@@ -1586,12 +1593,13 @@
       listEl.innerHTML = page.map(s => {
         const hasBottom = (s.customer_name) || (s.notes && s.notes !== 'Recorded from dashboard');
         return `
-        <div class="rs-sale-row">
+        <div class="rs-sale-row" id="rs-row-${s.sale_id}">
           <div class="rs-sale-top">
             <span class="rs-sale-sku">${s.sku || '—'}</span>
             <span class="rs-sale-ch" style="color:${rsChColor(s.channel)}">${rsChLabel(s.channel)}</span>
             <span class="rs-sale-price">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</span>
             <span class="rs-sale-date">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) + ' à ' + new Date(s.sold_at).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : ''}</span>
+            <button class="rs-del-btn" onclick="rsDeleteSale('${s.sale_id}', this)" title="Delete">✕</button>
           </div>
           ${hasBottom ? '<div class="rs-sale-bottom">' +
             (s.customer_name ? '<span class="rs-sale-customer">' + s.customer_name + '</span>' : '') +
@@ -1647,6 +1655,46 @@
       document.querySelectorAll('#rs-pills .rs-pill').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('rs-channel').value = btn.dataset.ch;
+    }
+
+    let _delArmed = null;
+    let _delTimer = null;
+    async function rsDeleteSale(saleId, btn) {
+      if (_delArmed !== saleId) {
+        // First tap — arm
+        if (_delArmed) {
+          // Reset previous armed button
+          const prev = document.querySelector('.rs-del-btn.armed');
+          if (prev) { prev.classList.remove('armed'); prev.textContent = '✕'; }
+        }
+        _delArmed = saleId;
+        btn.classList.add('armed');
+        btn.textContent = '?';
+        clearTimeout(_delTimer);
+        _delTimer = setTimeout(() => {
+          _delArmed = null;
+          btn.classList.remove('armed');
+          btn.textContent = '✕';
+        }, 3000);
+        return;
+      }
+      // Second tap — delete
+      _delArmed = null;
+      clearTimeout(_delTimer);
+      btn.textContent = '…';
+      try {
+        const res = await fetch('/api/sales/' + saleId, { method: 'DELETE' });
+        if (!res.ok && res.status !== 204) throw new Error('HTTP ' + res.status);
+        const row = document.getElementById('rs-row-' + saleId);
+        if (row) { row.style.opacity = '0'; setTimeout(() => row.remove(), 300); }
+        rsToast('Sale deleted', true);
+        // Refresh list and counter after short delay
+        setTimeout(() => { rsRenderSalesList(); renderRecordSale(document.getElementById('page-content')); }, 500);
+      } catch (e) {
+        btn.textContent = '✕';
+        btn.classList.remove('armed');
+        rsToast('Delete failed: ' + e.message, false);
+      }
     }
 
     function rsToast(msg, ok) {
@@ -1717,6 +1765,7 @@
       }
     }
 
+    const SYNC_LABEL = "Sync All to Shopify (unlist all SKUs)";
     let _syncTapCount = 0;
     let _syncTimer = null;
 
@@ -1724,19 +1773,11 @@
       _syncTapCount = 0;
       clearTimeout(_syncTimer);
       const btn = document.getElementById("rs-sync-btn");
-      if (btn) {
-        btn.textContent = "Sync to Shopify (set stock to 0)";
-        btn.style.borderColor = "";
-        btn.style.color = "";
-      }
+      if (btn) { btn.textContent = SYNC_LABEL; btn.style.borderColor = ""; btn.style.color = ""; }
     }
 
     function rsSyncShopifyStep() {
       const btn = document.getElementById("rs-sync-btn");
-      const sku = document.getElementById("rs-sku").value.trim();
-      const noSku = document.getElementById("rs-no-sku").checked;
-      if (!sku && !noSku) { rsToast("Enter a SKU first", false); return; }
-      if (noSku) { rsToast("Cannot sync without a SKU", false); return; }
 
       _syncTapCount++;
       clearTimeout(_syncTimer);
@@ -1747,27 +1788,31 @@
         btn.style.borderColor = "var(--warning, orange)";
         btn.style.color = "var(--warning, orange)";
       } else if (_syncTapCount === 2) {
-        btn.textContent = "Tap once more: set " + sku + " → 0";
+        btn.textContent = "Tap once more to unlist ALL";
         btn.style.borderColor = "var(--danger)";
         btn.style.color = "var(--danger)";
       } else if (_syncTapCount >= 3) {
         _syncTapCount = 0;
         clearTimeout(_syncTimer);
-        btn.textContent = "Syncing...";
+        btn.textContent = "Syncing all…";
         btn.style.borderColor = "";
         btn.style.color = "";
-        rsSyncShopifyConfirmed(sku, btn);
+        rsSyncAllConfirmed(btn);
       }
     }
 
-    async function rsSyncShopifyConfirmed(sku, btn) {
+    async function rsSyncAllConfirmed(btn) {
       try {
-        await apiPost("/api/sales/sync-shopify", { sku });
-        rsToast("Shopify stock zeroed for " + sku, true);
+        const res = await apiPost("/api/sales/sync-shopify-all", {});
+        const synced = res.synced || 0;
+        const notFound = (res.not_found || []).length;
+        let msg = synced + " SKU" + (synced !== 1 ? "s" : "") + " unlisted on Shopify";
+        if (notFound) msg += " (" + notFound + " not found)";
+        rsToast(msg, true);
       } catch (e) {
-        rsToast("Error: " + e.message, false);
+        rsToast("Sync error: " + e.message, false);
       } finally {
-        btn.textContent = "Sync to Shopify (set stock to 0)";
+        btn.textContent = SYNC_LABEL;
       }
     }
 

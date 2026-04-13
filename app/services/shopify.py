@@ -185,6 +185,14 @@ class ShopifyAdminClient:
 
         return {"status": "zeroed", "product_id": product_id, "variants": results}
 
+    async def set_product_status(self, product_id: int, status: str = "draft") -> dict:
+        """Set a product's status (active, draft, archived)."""
+        return await self._request(
+            "PUT",
+            f"products/{product_id}.json",
+            json_body={"product": {"id": product_id, "status": status}},
+        )
+
     # ── Metafields ───────────────────────────────────────────────────
     async def get_product_metafields(self, product_id: int) -> dict:
         return await self._request("GET", f"products/{product_id}/metafields.json")

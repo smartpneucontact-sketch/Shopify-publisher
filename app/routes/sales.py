@@ -725,12 +725,6 @@ async def get_shopify_statuses():
     except Exception:
         products = []
 
-    # Get locally tracked unlisted SKUs
-    try:
-        unlisted_set = await sales_db.get_unlisted_skus()
-    except Exception:
-        unlisted_set = set()
-
     result = {}
     for p in products:
         p_status = p.get("status", "unknown")
@@ -738,7 +732,12 @@ async def get_shopify_statuses():
             sku = v.get("sku", "")
             if sku in skus:
                 inv = v.get("inventory_quantity", v.get("inventoryQuantity", None))
-                if sku in unlisted_set:
+                # SKU is in the sales list, so determine effective status:
+                # - active with stock > 0 → "active"
+                # - active with stock 0 → "unlisted" (sold, stock zeroed)
+                # - draft → "unlisted" (sold, set to draft)
+                # - archived → "archived"
+                if p_status == "draft" or (p_status == "active" and (inv is not None and inv <= 0)):
                     effective_status = "unlisted"
                 else:
                     effective_status = p_status

@@ -1543,6 +1543,15 @@
           .rs-sale-bottom { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
           .rs-sale-customer { font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
           .rs-sale-notes { font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .rs-shopify-badge {
+            font-size: 8px; font-weight: 700; letter-spacing: 0.3px; padding: 2px 5px;
+            border-radius: 4px; flex-shrink: 0; text-transform: uppercase;
+          }
+          .rs-shopify-badge.active { background: rgba(34,197,94,0.15); color: #22c55e; }
+          .rs-shopify-badge.draft { background: rgba(234,179,8,0.15); color: #eab308; }
+          .rs-shopify-badge.archived { background: rgba(107,114,128,0.15); color: #6b7280; }
+          .rs-shopify-badge.not_found { background: rgba(239,68,68,0.15); color: #ef4444; }
+          .rs-shopify-badge.zeroed { background: rgba(239,68,68,0.15); color: #ef4444; }
           .rs-del-btn {
             background: none; border: none; color: var(--text-tertiary); font-size: 16px;
             padding: 4px 6px; cursor: pointer; flex-shrink: 0; opacity: 0.5;
@@ -1568,6 +1577,16 @@
       // Render first page of sales
       window._rsSalesData = allSales;
       rsRenderSalesList();
+      // Fetch Shopify statuses in background
+      rsLoadShopifyStatuses();
+    }
+
+    async function rsLoadShopifyStatuses() {
+      try {
+        const res = await apiFetch("/api/sales/shopify-statuses");
+        window._rsShopifyStatuses = res.statuses || {};
+        rsRenderSalesList(); // re-render with status badges
+      } catch(e) { window._rsShopifyStatuses = {}; }
     }
 
     function rsChColor(ch) {
@@ -1575,6 +1594,21 @@
     }
     function rsChLabel(ch) {
       return ch === "ebay_kleinanzeigen" ? "KA" : (ch || "—").toUpperCase();
+    }
+
+    function rsShopifyBadge(sku) {
+      const statuses = window._rsShopifyStatuses || {};
+      const info = statuses[sku];
+      if (!info || !sku || sku.startsWith("NOSSKU-")) return '';
+      const st = info.status || 'unknown';
+      let label = st;
+      let cls = st;
+      if (st === 'active' && info.inventory === 0) { label = 'stock 0'; cls = 'zeroed'; }
+      else if (st === 'active') { label = 'active'; }
+      else if (st === 'draft') { label = 'draft'; }
+      else if (st === 'archived') { label = 'archived'; }
+      else if (st === 'not_found') { label = 'not on shopify'; }
+      return '<span class="rs-shopify-badge ' + cls + '">' + label + '</span>';
     }
 
     function rsRenderSalesList() {
@@ -1597,6 +1631,7 @@
           <div class="rs-sale-top">
             <span class="rs-sale-sku">${s.sku || '—'}</span>
             <span class="rs-sale-ch" style="color:${rsChColor(s.channel)}">${rsChLabel(s.channel)}</span>
+            ${rsShopifyBadge(s.sku)}
             <span class="rs-sale-price">${s.sale_price ? s.sale_price.toFixed(2) + ' EUR' : '—'}</span>
             <span class="rs-sale-date">${s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) + ' à ' + new Date(s.sold_at).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : ''}</span>
             <button class="rs-del-btn" onclick="rsDeleteSale('${s.sale_id}', this)" title="Delete">✕</button>
@@ -1731,6 +1766,15 @@
 
       if (!noSku && !sku) { rsToast("SKU is required (or check No SKU)", false); return; }
       if (!price) { rsToast("Price is required", false); return; }
+
+      // Duplicate SKU check (skip for no-SKU sales)
+      if (!noSku) {
+        const existing = (window._rsSalesData || []).find(s => s.sku === sku);
+        if (existing) {
+          rsToast("SKU " + sku + " is already in the list", false);
+          return;
+        }
+      }
 
       btn.disabled = true;
       btn.textContent = "Saving...";

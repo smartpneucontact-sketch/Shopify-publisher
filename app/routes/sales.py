@@ -696,3 +696,54 @@ async def sync_all_sales_to_shopify():
         "not_found": list(skus - set(sku_product.keys())),
         "errors": errors,
     }
+
+
+@router.get("/shopify-statuses")
+async def get_shopify_statuses():
+    """
+    Return Shopify product status for every SKU in the sales list.
+    Returns a dict mapping SKU → {status, inventory}.
+    """
+    all_sales = await sales_db.get_sales(
+        channel=None, start_date=None, end_date=None,
+        sku=None, limit=10000, offset=0,
+    )
+    skus = set()
+    for s in all_sales:
+        sku = s.get("sku", "")
+        if sku and not sku.startswith("NOSSKU-"):
+            skus.add(sku)
+
+    if not skus:
+        return {"statuses": {}}
+
+    try:
+        products = await shopify_client.get_products_with_metafields()
+    except Exception:
+        products = []
+
+    result = {}
+    for p in products:
+        p_status = p.get("status", "unknown")
+        for v in p.get("variants", []):
+            sku = v.get("sku", "")
+            if sku in skus:
+                inv = v.get("inventoryQuantity", v.get("inventory_quantity", None))
+                result[sku] = {"status": p_status, "inventory": inv}
+
+    # Mark SKUs not found in Shopify
+    for sku in skus:
+        if sku not in result:
+            result[sku] = {"status": "not_found", "inventory": None}
+
+    return {"statuses": result}
+
+
+@router.get("/check-sku/{sku}")
+async def check_sku_exists(sku: str):
+    """Check if a SKU already has a sale recorded."""
+    existing = await sales_db.get_sales(
+        channel=None, start_date=None, end_date=None,
+        sku=sku, limit=1, offset=0,
+    )
+    return {"exists": len(existing) > 0, "sku": sku}

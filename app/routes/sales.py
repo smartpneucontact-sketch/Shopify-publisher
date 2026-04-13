@@ -593,8 +593,9 @@ async def delete_sale(sale_id: str):
                 sku=sku_to_check, limit=1000, offset=0,
             )
             if not remaining:
-                # No more sales for this SKU — set Shopify product to draft
-                # (only if it was never sold via Shopify)
+                # No more sales for this SKU — unmark as unlisted
+                await sales_db.unmark_sku_unlisted(sku_to_check)
+                # Set Shopify product to draft (only if not sold via Shopify)
                 shopify_sold = any(s.get("channel") == "shopify" for s in remaining)
                 if not shopify_sold:
                     try:
@@ -603,13 +604,6 @@ async def delete_sale(sale_id: str):
                             for v in p.get("variants", []):
                                 if v.get("sku") == sku_to_check:
                                     await shopify_client.set_product_status(p["id"], "draft")
-                                    # Clear the unlisted metafield
-                                    try:
-                                        await shopify_client.set_product_metafield(
-                                            p["id"], "smartpneu", "sale_unlisted", ""
-                                        )
-                                    except Exception:
-                                        pass
                                     break
                     except Exception:
                         pass  # Best effort — don't fail the delete
@@ -645,12 +639,7 @@ async def sync_sale_to_shopify(body: SyncShopifyRequest):
                     )
                 except Exception:
                     pass
-                try:
-                    await shopify_client.set_product_metafield(
-                        p["id"], "smartpneu", "sale_unlisted", "true"
-                    )
-                except Exception:
-                    pass
+                await sales_db.mark_sku_unlisted(body.sku)
                 return {"status": "synced", "sku": body.sku, "result": result}
 
     raise HTTPException(status_code=404, detail=f"SKU {body.sku} not found in Shopify")
@@ -698,12 +687,7 @@ async def sync_all_sales_to_shopify():
                 )
             except Exception:
                 pass
-            try:
-                await shopify_client.set_product_metafield(
-                    product["id"], "smartpneu", "sale_unlisted", "true"
-                )
-            except Exception:
-                pass
+            await sales_db.mark_sku_unlisted(sku)
             synced.append(sku)
         except Exception as e:
             errors.append({"sku": sku, "error": str(e)})
@@ -737,24 +721,24 @@ async def get_shopify_statuses():
         return {"statuses": {}}
 
     try:
-        products = await shopify_client.get_products_with_metafields()
+        products = await shopify_client.get_all_products()
     except Exception:
         products = []
+
+    # Get locally tracked unlisted SKUs
+    unlisted_set = await sales_db.get_unlisted_skus()
 
     result = {}
     for p in products:
         p_status = p.get("status", "unknown")
-        # Check for unlisted metafield
-        is_unlisted = False
-        for mf in p.get("metafields", []):
-            if mf.get("namespace") == "smartpneu" and mf.get("key") == "sale_unlisted" and mf.get("value") == "true":
-                is_unlisted = True
-                break
         for v in p.get("variants", []):
             sku = v.get("sku", "")
             if sku in skus:
-                inv = v.get("inventoryQuantity", v.get("inventory_quantity", None))
-                effective_status = "unlisted" if is_unlisted else p_status
+                inv = v.get("inventory_quantity", v.get("inventoryQuantity", None))
+                if sku in unlisted_set:
+                    effective_status = "unlisted"
+                else:
+                    effective_status = p_status
                 result[sku] = {"status": effective_status, "inventory": inv}
 
     # Mark SKUs not found in Shopify

@@ -74,7 +74,39 @@ class SalesDB:
                 "CREATE INDEX IF NOT EXISTS idx_sales_sold_at ON sales(sold_at)"
             )
 
+            # Track which SKUs have been unlisted via sync
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS unlisted_skus (
+                    sku TEXT PRIMARY KEY,
+                    unlisted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
             await db.commit()
+
+    async def mark_sku_unlisted(self, sku: str) -> None:
+        """Mark a SKU as unlisted (synced to Shopify with stock 0)."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO unlisted_skus (sku, unlisted_at) VALUES (?, datetime('now'))",
+                (sku,),
+            )
+            await db.commit()
+
+    async def unmark_sku_unlisted(self, sku: str) -> None:
+        """Remove unlisted mark from a SKU."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("DELETE FROM unlisted_skus WHERE sku = ?", (sku,))
+            await db.commit()
+
+    async def get_unlisted_skus(self) -> set:
+        """Get all SKUs currently marked as unlisted."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("SELECT sku FROM unlisted_skus")
+            rows = await cursor.fetchall()
+            return {r[0] for r in rows}
 
     async def record_sale(self, sale_data: Dict[str, Any]) -> Dict[str, Any]:
         """

@@ -44,9 +44,7 @@ class SalesDB:
                 CREATE TABLE IF NOT EXISTS sales (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     sku TEXT NOT NULL,
-                    channel TEXT NOT NULL CHECK (
-                        channel IN ('shopify', 'ebay', 'ebay_kleinanzeigen', 'leboncoin', 'cash')
-                    ),
+                    channel TEXT NOT NULL,
                     sale_price REAL NOT NULL,
                     currency TEXT DEFAULT 'EUR',
                     quantity INTEGER DEFAULT 1,
@@ -62,6 +60,36 @@ class SalesDB:
                 )
                 """
             )
+
+            # Migrate: remove CHECK constraint on channel (Python validation handles it)
+            cursor = await db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='sales'")
+            row = await cursor.fetchone()
+            if row and row[0] and 'CHECK' in row[0]:
+                await db.execute("ALTER TABLE sales RENAME TO sales_old")
+                await db.execute(
+                    """
+                    CREATE TABLE sales (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        sku TEXT NOT NULL,
+                        channel TEXT NOT NULL,
+                        sale_price REAL NOT NULL,
+                        currency TEXT DEFAULT 'EUR',
+                        quantity INTEGER DEFAULT 1,
+                        order_ref TEXT,
+                        customer_name TEXT,
+                        customer_email TEXT,
+                        notes TEXT,
+                        sold_at TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        product_title TEXT,
+                        brand TEXT,
+                        model TEXT
+                    )
+                    """
+                )
+                await db.execute("INSERT INTO sales SELECT * FROM sales_old")
+                await db.execute("DROP TABLE sales_old")
+                await db.commit()
 
             # Create index for common queries
             await db.execute(

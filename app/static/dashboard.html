@@ -1442,6 +1442,23 @@
 
           <div id="rs-toast" class="rs-toast"></div>
 
+          <!-- Stats cards: totals + averages -->
+          <div class="rs-stats-grid" id="rs-stats-grid"></div>
+
+          <!-- Chart: daily revenue over time -->
+          <div class="rs-chart-section">
+            <div class="rs-chart-header">
+              <h3 style="font-size:13px;font-weight:600;color:var(--text-secondary);margin:0">Daily Revenue</h3>
+              <div class="rs-chart-pills" id="rs-chart-pills">
+                <button class="rs-chart-pill" data-days="1" onclick="rsPickChartRange(this)">1D</button>
+                <button class="rs-chart-pill active" data-days="7" onclick="rsPickChartRange(this)">1W</button>
+                <button class="rs-chart-pill" data-days="30" onclick="rsPickChartRange(this)">1M</button>
+                <button class="rs-chart-pill" data-days="90" onclick="rsPickChartRange(this)">3M</button>
+              </div>
+            </div>
+            <div id="rs-chart" class="rs-chart-canvas"></div>
+          </div>
+
           <input type="text" id="rs-search" class="rs-search" placeholder="Search SKU…" inputmode="numeric" oninput="rsOnSearch(this)">
 
           <div class="rs-recent">
@@ -1474,6 +1491,61 @@
           .rs-page {
             max-width: 520px; margin: 0 auto; padding: 0 8px;
             overflow-x: hidden; box-sizing: border-box;
+          }
+
+          .rs-stats-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            margin: 16px 0 12px;
+          }
+          .rs-stat-card {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 10px; padding: 10px 8px; text-align: center;
+          }
+          .rs-stat-value {
+            font-family: 'JetBrains Mono', monospace; font-size: 15px;
+            font-weight: 700; color: var(--text-primary); line-height: 1.2;
+          }
+          .rs-stat-label {
+            font-size: 9px; color: var(--text-tertiary); text-transform: uppercase;
+            letter-spacing: 0.3px; margin-top: 3px;
+          }
+
+          .rs-chart-section {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px; margin: 0 0 12px;
+          }
+          .rs-chart-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+          }
+          .rs-chart-pills { display: flex; gap: 4px; }
+          .rs-chart-pill {
+            padding: 5px 10px; border-radius: 14px; border: 1px solid var(--border);
+            background: transparent; color: var(--text-tertiary); font-size: 11px;
+            font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
+          }
+          .rs-chart-pill.active {
+            background: var(--accent); color: #0a0a0b; border-color: var(--accent);
+          }
+          .rs-chart-canvas {
+            width: 100%; height: 160px; position: relative; overflow: hidden;
+          }
+          .rs-chart-canvas svg { width: 100%; height: 100%; }
+          .rs-chart-bar {
+            fill: var(--accent); opacity: 0.7; rx: 2;
+          }
+          .rs-chart-bar:hover { opacity: 1; }
+          .rs-chart-label {
+            font-size: 9px; fill: var(--text-tertiary);
+            font-family: 'JetBrains Mono', monospace; text-anchor: middle;
+          }
+          .rs-chart-val {
+            font-size: 8px; fill: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace; text-anchor: middle;
+          }
+          .rs-chart-grid { stroke: var(--border); stroke-width: 0.5; }
+          .rs-chart-empty {
+            display: flex; align-items: center; justify-content: center;
+            height: 100%; color: var(--text-tertiary); font-size: 12px;
           }
 
           .rs-today { text-align: center; padding: 16px 0 20px; }
@@ -1631,6 +1703,8 @@
       // Render first page of sales
       window._rsSalesData = allSales;
       rsRenderSalesList();
+      rsRenderStats();
+      rsRenderChart();
       rsLoadEbaySold();
       // Fetch Shopify statuses + Shopify-sold list in background
       rsLoadShopifyStatuses();
@@ -1732,6 +1806,131 @@
       if (dayEl) dayEl.value = now.getDate();
       if (monthEl) monthEl.value = now.getMonth() + 1;
       if (yearEl) yearEl.value = now.getFullYear();
+    }
+
+    // ── Stats & Chart ──────────────────────────────────────────────
+    let _rsChartDays = 7;
+
+    function rsPickChartRange(btn) {
+      document.querySelectorAll('#rs-chart-pills .rs-chart-pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      _rsChartDays = parseInt(btn.dataset.days);
+      rsRenderChart();
+    }
+
+    function rsComputeStats() {
+      const allSales = window._rsSalesData || [];
+      const now = new Date();
+      const msDay = 86400000;
+
+      function salesInDays(n) {
+        const cutoff = new Date(now.getTime() - n * msDay);
+        return allSales.filter(s => s.sold_at && new Date(s.sold_at) >= cutoff);
+      }
+
+      const s7 = salesInDays(7), s30 = salesInDays(30), s90 = salesInDays(90);
+      const r7 = s7.reduce((a, s) => a + (s.sale_price || 0), 0);
+      const r30 = s30.reduce((a, s) => a + (s.sale_price || 0), 0);
+      const r90 = s90.reduce((a, s) => a + (s.sale_price || 0), 0);
+
+      return {
+        total7: r7, total30: r30, total90: r90,
+        count7: s7.length, count30: s30.length, count90: s90.length,
+        avg7: s7.length ? r7 / s7.length : 0,
+        avg30: s30.length ? r30 / s30.length : 0,
+        avg90: s90.length ? r90 / s90.length : 0,
+      };
+    }
+
+    function rsRenderStats() {
+      const el = document.getElementById("rs-stats-grid");
+      if (!el) return;
+      const s = rsComputeStats();
+
+      function card(value, label) {
+        return '<div class="rs-stat-card"><div class="rs-stat-value">' + value + '</div><div class="rs-stat-label">' + label + '</div></div>';
+      }
+      function eur(v) { return v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v.toFixed(0); }
+
+      el.innerHTML =
+        card(eur(s.total7) + ' \u20AC', 'Total 7d') +
+        card(eur(s.total30) + ' \u20AC', 'Total 30d') +
+        card(eur(s.total90) + ' \u20AC', 'Total 90d') +
+        card(eur(s.avg7) + ' \u20AC', 'Avg/sale 7d') +
+        card(eur(s.avg30) + ' \u20AC', 'Avg/sale 30d') +
+        card(eur(s.avg90) + ' \u20AC', 'Avg/sale 90d') +
+        card(s.count7, 'Sales 7d') +
+        card(s.count30, 'Sales 30d') +
+        card(s.count90, 'Sales 90d');
+    }
+
+    function rsRenderChart() {
+      const el = document.getElementById("rs-chart");
+      if (!el) return;
+      const allSales = window._rsSalesData || [];
+      const days = _rsChartDays;
+      const now = new Date();
+      const msDay = 86400000;
+
+      // Build daily buckets
+      const buckets = [];
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * msDay);
+        const key = d.toISOString().slice(0, 10);
+        buckets.push({ key, label: d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }), revenue: 0, count: 0 });
+      }
+
+      allSales.forEach(s => {
+        if (!s.sold_at) return;
+        const key = s.sold_at.slice(0, 10);
+        const b = buckets.find(b => b.key === key);
+        if (b) { b.revenue += (s.sale_price || 0); b.count++; }
+      });
+
+      const maxRev = Math.max(...buckets.map(b => b.revenue), 1);
+      const w = el.clientWidth || 480;
+      const h = 160;
+      const padTop = 16, padBot = 24, padLeft = 4, padRight = 4;
+      const chartH = h - padTop - padBot;
+      const barCount = buckets.length;
+      const gap = Math.max(2, Math.min(6, Math.floor(w / barCount * 0.2)));
+      const barW = Math.max(4, (w - padLeft - padRight - gap * barCount) / barCount);
+
+      // Grid lines
+      let gridLines = '';
+      for (let i = 0; i <= 3; i++) {
+        const y = padTop + chartH * (1 - i / 3);
+        gridLines += '<line class="rs-chart-grid" x1="' + padLeft + '" x2="' + (w - padRight) + '" y1="' + y + '" y2="' + y + '"/>';
+      }
+
+      // Bars + labels
+      let bars = '';
+      buckets.forEach((b, i) => {
+        const x = padLeft + i * (barW + gap) + gap / 2;
+        const barH = b.revenue > 0 ? Math.max(3, (b.revenue / maxRev) * chartH) : 0;
+        const y = padTop + chartH - barH;
+
+        bars += '<rect class="rs-chart-bar" x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '"/>';
+
+        // Value on top
+        if (b.revenue > 0) {
+          bars += '<text class="rs-chart-val" x="' + (x + barW / 2) + '" y="' + (y - 3) + '">' + (b.revenue >= 1000 ? (b.revenue / 1000).toFixed(1) + 'K' : b.revenue.toFixed(0)) + '</text>';
+        }
+
+        // Date label (show every Nth to avoid overlap)
+        const showLabel = days <= 7 || (days <= 30 && i % 7 === 0) || (days <= 90 && i % 14 === 0) || i === barCount - 1;
+        if (showLabel) {
+          const lbl = days <= 7 ? b.label : b.key.slice(5);
+          bars += '<text class="rs-chart-label" x="' + (x + barW / 2) + '" y="' + (h - 4) + '">' + lbl + '</text>';
+        }
+      });
+
+      if (buckets.every(b => b.revenue === 0)) {
+        el.innerHTML = '<div class="rs-chart-empty">No data for this period</div>';
+        return;
+      }
+
+      el.innerHTML = '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' + gridLines + bars + '</svg>';
     }
 
     function rsGetFilteredSales() {
@@ -1875,6 +2074,8 @@
         if (badgeEl) badgeEl.textContent = allSales.length + " sales \u00b7 " + totalRevenue.toFixed(2) + " EUR";
         // Re-render lists from updated cache
         rsRenderSalesList();
+        rsRenderStats();
+        rsRenderChart();
         rsLoadEbaySold();
         rsLoadShopifySold();
         rsToast('Sale deleted', true);
@@ -1960,6 +2161,8 @@
             if (badgeEl) badgeEl.textContent = allSales.length + " sales \u00b7 " + totalRevenue.toFixed(2) + " EUR";
             rsPageOffset = 0;
             rsRenderSalesList();
+            rsRenderStats();
+            rsRenderChart();
             rsLoadEbaySold();
             rsLoadShopifyStatuses();
             rsLoadShopifySold();

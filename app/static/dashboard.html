@@ -1844,9 +1844,9 @@
       return {
         total7: r7, total30: r30, total90: r90,
         count7: s7.length, count30: s30.length, count90: s90.length,
-        avg7: s7.length ? r7 / s7.length : 0,
-        avg30: s30.length ? r30 / s30.length : 0,
-        avg90: s90.length ? r90 / s90.length : 0,
+        avg7: r7 / 7,
+        avg30: r30 / 30,
+        avg90: r90 / 90,
       };
     }
 
@@ -1864,9 +1864,9 @@
         card(eur(s.total7) + ' \u20AC', 'Total 7d') +
         card(eur(s.total30) + ' \u20AC', 'Total 30d') +
         card(eur(s.total90) + ' \u20AC', 'Total 90d') +
-        card(eur(s.avg7) + ' \u20AC', 'Avg/sale 7d') +
-        card(eur(s.avg30) + ' \u20AC', 'Avg/sale 30d') +
-        card(eur(s.avg90) + ' \u20AC', 'Avg/sale 90d') +
+        card(eur(s.avg7) + ' \u20AC', 'Avg/day 7d') +
+        card(eur(s.avg30) + ' \u20AC', 'Avg/day 30d') +
+        card(eur(s.avg90) + ' \u20AC', 'Avg/day 90d') +
         card(s.count7, 'Sales 7d') +
         card(s.count30, 'Sales 30d') +
         card(s.count90, 'Sales 90d');

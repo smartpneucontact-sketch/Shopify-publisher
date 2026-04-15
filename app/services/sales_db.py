@@ -144,7 +144,7 @@ class SalesDB:
             raise ValueError("sale_price is required")
 
         # Validate channel
-        valid_channels = ["shopify", "ebay", "ebay_kleinanzeigen", "leboncoin", "cash"]
+        valid_channels = ["shopify", "ebay", "ebay_kleinanzeigen", "leboncoin", "cash", "cash_de", "cash_fr"]
         if sale_data["channel"] not in valid_channels:
             raise ValueError(
                 f"channel must be one of {valid_channels}, got {sale_data['channel']}"

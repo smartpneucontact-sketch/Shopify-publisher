@@ -1880,17 +1880,21 @@
       const now = new Date();
       const msDay = 86400000;
 
-      // Build daily buckets
+      // Build daily buckets (using local dates)
+      function localDateKey(date) {
+        const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + d;
+      }
       const buckets = [];
       for (let i = days - 1; i >= 0; i--) {
         const d = new Date(now.getTime() - i * msDay);
-        const key = d.toISOString().slice(0, 10);
+        const key = localDateKey(d);
         buckets.push({ key, label: d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }), revenue: 0, count: 0 });
       }
 
       allSales.forEach(s => {
         if (!s.sold_at) return;
-        const key = s.sold_at.slice(0, 10);
+        const key = localDateKey(new Date(s.sold_at));
         const b = buckets.find(b => b.key === key);
         if (b) { b.revenue += (s.sale_price || 0); b.count++; }
       });

@@ -1369,7 +1369,7 @@
     // ── Record Sale (dedicated mobile-friendly page) ────────────────
     // ── Record Sale page state ────────────────────────────────────
     let rsPageOffset = 0;
-    const RS_PAGE_SIZE = 50;
+    const RS_PAGE_SIZE = 15;
 
     async function renderRecordSale(el) {
       el.innerHTML = `<div style="display:flex;justify-content:center;padding:20px"><span class="pulse" style="color:var(--text-tertiary)">Loading...</span></div>`;
@@ -1465,6 +1465,7 @@
             <div class="rs-recent-header">
               <h3>Recorded Sales</h3>
               <span class="rs-total-badge" id="rs-total-badge">${allSales.length} sales &middot; ${totalRevenue.toFixed(2)} EUR</span>
+              <button class="rs-download-btn" onclick="rsDownloadExcel()" title="Download all sales as Excel">&#x2B07; Excel</button>
             </div>
             <div id="rs-list"></div>
             <div id="rs-pagination" style="display:flex;justify-content:center;gap:12px;padding:16px 0"></div>
@@ -1690,6 +1691,13 @@
           }
           .rs-pager-btn:active { background: var(--bg-tertiary); }
           .rs-pager-btn:disabled { opacity: 0.3; cursor: default; }
+
+          .rs-download-btn {
+            padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+            background: var(--bg-secondary); color: var(--text-secondary); font-size: 12px;
+            cursor: pointer; -webkit-tap-highlight-color: transparent; margin-left: auto;
+          }
+          .rs-download-btn:active { background: var(--bg-tertiary); }
 
           @media (max-width: 600px) {
             .rs-page { padding: 0 6px; }
@@ -1999,6 +2007,32 @@
       if (rsPageOffset >= allSales.length) rsPageOffset = Math.max(0, allSales.length - RS_PAGE_SIZE);
       rsRenderSalesList();
       document.getElementById("rs-list").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function rsDownloadExcel() {
+      const sales = window._rsSalesData || [];
+      if (!sales.length) { rsToast('No sales to export', true); return; }
+
+      // Build CSV content (Excel-compatible with BOM)
+      const headers = ['Sale ID','SKU','Channel','Price (EUR)','Customer','Notes','Date'];
+      const rows = sales.map(s => [
+        s.sale_id,
+        s.sku || '',
+        s.channel || '',
+        s.sale_price != null ? s.sale_price.toFixed(2) : '',
+        (s.customer_name || '').replace(/"/g, '""'),
+        (s.notes && s.notes !== 'Recorded from dashboard' ? s.notes : '').replace(/"/g, '""'),
+        s.sold_at ? new Date(s.sold_at).toISOString().slice(0, 10) : ''
+      ]);
+      const csv = '\uFEFF' + [headers, ...rows].map(r => r.map(c => '"' + c + '"').join(',')).join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sales_export_' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     function rsToggleNoSku() {

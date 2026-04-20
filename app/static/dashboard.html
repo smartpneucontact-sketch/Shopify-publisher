@@ -358,6 +358,7 @@
       { id: "tires", label: "Tires", icon: "tire" },
       { id: "ebay", label: "eBay", icon: "ebay" },
       { id: "record-sale", label: "Record Sale", icon: "banknote" },
+      { id: "expenses", label: "Expenses", icon: "receipt" },
       { id: "orders", label: "Orders", icon: "shopping-bag" },
       { id: "customers", label: "Customers", icon: "users" },
       { id: "inventory", label: "Inventory", icon: "box" },
@@ -376,6 +377,7 @@
       "alert": `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
       "ebay": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 8l3 3-3 3"/><line x1="13" y1="13" x2="17" y2="13"/></svg>`,
       "banknote": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 6v12"/><path d="M18 6v12"/></svg>`,
+      "receipt": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2-3-2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>`,
     };
 
     // ── API ─────────────────────────────────────────────────────────
@@ -578,6 +580,7 @@
         case "tires": return renderTires(el);
         case "ebay": return renderEbay(el);
         case "record-sale": return renderRecordSale(el);
+        case "expenses": return renderExpenses(el);
         case "orders": return renderOrders(el);
         case "customers": return renderCustomers(el);
         case "inventory": return renderInventory(el);
@@ -1364,6 +1367,286 @@
             }).join("")}
           </tbody></table></div>`;
       } catch (e) { el.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
+    }
+
+    // ── EXPENSES PAGE ──────────────────────────────────────────────
+    let expPageOffset = 0;
+    const EXP_PAGE_SIZE = 15;
+
+    async function renderExpenses(el) {
+      el.innerHTML = `<div style="display:flex;justify-content:center;padding:20px"><span class="pulse" style="color:var(--text-tertiary)">Loading...</span></div>`;
+      expPageOffset = 0;
+      let allExpenses = [];
+      try { const r = await apiFetch("/api/expenses/?limit=500"); allExpenses = Array.isArray(r) ? r : []; } catch(e) {}
+
+      const totalExpenses = allExpenses.reduce((sum, e) => sum + (e.total_amount || 0), 0);
+      window._expData = allExpenses;
+
+      el.innerHTML = `
+        <div class="rs-page fade-in">
+          <form id="exp-form" onsubmit="expSubmit(event)" class="rs-form" autocomplete="off">
+            <div class="rs-field">
+              <label>Upload Invoice</label>
+              <div style="display:flex;gap:8px">
+                <label class="rs-submit" style="flex:1;text-align:center;cursor:pointer;font-size:14px;padding:12px">
+                  📷 Take Photo
+                  <input type="file" id="exp-file" accept="image/*,application/pdf" capture="environment" style="display:none" onchange="expOnFile(this)">
+                </label>
+                <label class="rs-submit" style="flex:1;text-align:center;cursor:pointer;font-size:14px;padding:12px;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border)">
+                  📎 Choose File
+                  <input type="file" id="exp-file2" accept="image/*,application/pdf" style="display:none" onchange="expOnFile(this)">
+                </label>
+              </div>
+              <div id="exp-preview" style="display:none;margin-top:8px;text-align:center">
+                <img id="exp-preview-img" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border)">
+              </div>
+              <div id="exp-parsing" style="display:none;text-align:center;padding:12px;color:var(--accent)">
+                <span class="pulse">Reading invoice with AI...</span>
+              </div>
+            </div>
+
+            <div class="rs-field">
+              <label>Date</label>
+              <input type="date" id="exp-date" required>
+            </div>
+
+            <div class="rs-field">
+              <label>Vendor</label>
+              <input type="text" id="exp-vendor" placeholder="Supplier name">
+            </div>
+
+            <div class="rs-field">
+              <label>Total (EUR)</label>
+              <input type="number" id="exp-total" inputmode="decimal" placeholder="0.00" required step="0.01" min="0">
+            </div>
+
+            <div class="rs-field">
+              <label>Notes (optional)</label>
+              <input type="text" id="exp-notes" placeholder="Any details">
+            </div>
+
+            <input type="hidden" id="exp-image-path" value="">
+            <button type="submit" class="rs-submit" id="exp-submit-btn">Record Expense</button>
+          </form>
+
+          <div id="exp-toast" class="rs-toast"></div>
+
+          <div class="rs-recent">
+            <div class="rs-recent-header">
+              <h3>Recorded Expenses</h3>
+              <span class="rs-total-badge" id="exp-total-badge">${allExpenses.length} expenses &middot; ${totalExpenses.toFixed(2)} EUR</span>
+              <button class="rs-download-btn" onclick="expDownloadExcel()" title="Download all expenses as Excel">&#x2B07; Excel</button>
+            </div>
+            <div id="exp-list"></div>
+            <div id="exp-pagination" style="display:flex;justify-content:center;gap:12px;padding:16px 0"></div>
+          </div>
+        </div>
+      `;
+
+      // Default date to today
+      const today = new Date();
+      document.getElementById("exp-date").value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+
+      expRenderList();
+    }
+
+    async function expOnFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      // Show preview for images
+      const preview = document.getElementById("exp-preview");
+      const previewImg = document.getElementById("exp-preview-img");
+      if (file.type.startsWith("image/")) {
+        previewImg.src = URL.createObjectURL(file);
+        preview.style.display = "block";
+      } else {
+        preview.style.display = "none";
+      }
+
+      // Send to Claude for parsing
+      const parsing = document.getElementById("exp-parsing");
+      parsing.style.display = "block";
+
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
+        const resp = await fetch(base + "/api/expenses/parse-invoice", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+
+        // Pre-fill form fields
+        if (data.vendor) document.getElementById("exp-vendor").value = data.vendor;
+        if (data.date) document.getElementById("exp-date").value = data.date;
+        if (data.total) document.getElementById("exp-total").value = data.total.toFixed(2);
+        if (data.image_path) document.getElementById("exp-image-path").value = data.image_path;
+
+        if (data.error) {
+          expToast("Invoice uploaded but could not auto-read — please fill in manually", true);
+        } else {
+          expToast("Invoice read successfully!");
+        }
+      } catch(e) {
+        expToast("Could not read invoice: " + e.message, true);
+      } finally {
+        parsing.style.display = "none";
+      }
+    }
+
+    async function expSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById("exp-submit-btn");
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      try {
+        const body = {
+          expense_date: document.getElementById("exp-date").value,
+          vendor: document.getElementById("exp-vendor").value,
+          total_amount: parseFloat(document.getElementById("exp-total").value),
+          notes: document.getElementById("exp-notes").value,
+          image_path: document.getElementById("exp-image-path").value,
+        };
+
+        await apiPost("/api/expenses/", body);
+        expToast("Expense recorded!");
+
+        // Refresh
+        const r = await apiFetch("/api/expenses/?limit=500");
+        window._expData = Array.isArray(r) ? r : [];
+        const total = window._expData.reduce((s, e) => s + (e.total_amount || 0), 0);
+        document.getElementById("exp-total-badge").textContent = window._expData.length + ' expenses \u00B7 ' + total.toFixed(2) + ' EUR';
+
+        // Reset form
+        document.getElementById("exp-vendor").value = "";
+        document.getElementById("exp-total").value = "";
+        document.getElementById("exp-notes").value = "";
+        document.getElementById("exp-image-path").value = "";
+        document.getElementById("exp-preview").style.display = "none";
+
+        expPageOffset = 0;
+        expRenderList();
+      } catch(e) {
+        expToast("Error: " + e.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Record Expense";
+      }
+    }
+
+    function expRenderList() {
+      const filtered = window._expData || [];
+      const page = filtered.slice(expPageOffset, expPageOffset + EXP_PAGE_SIZE);
+      const listEl = document.getElementById("exp-list");
+      const pagEl = document.getElementById("exp-pagination");
+      if (!listEl) return;
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="rs-empty">No expenses recorded yet</div>';
+        pagEl.innerHTML = '';
+        return;
+      }
+
+      listEl.innerHTML = page.map(e => `
+        <div class="rs-sale-row" id="exp-row-${e.id}">
+          <div class="rs-sale-line1">
+            <span class="rs-sale-sku" style="color:var(--text-primary)">${e.vendor || 'Unknown'}</span>
+            <span class="rs-sale-price" style="color:#ff6b6b">${e.total_amount ? e.total_amount.toFixed(2) + ' \u20AC' : '\u2014'}</span>
+            <button class="rs-del-btn" onclick="expDelete('${e.id}', this)" title="Delete">\u2715</button>
+          </div>
+          <div class="rs-sale-line2">
+            <span class="rs-sale-date">${e.expense_date ? new Date(e.expense_date + 'T00:00:00').toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) : ''}</span>
+            ${e.notes ? '<span class="rs-sale-meta">' + e.notes + '</span>' : ''}
+            ${e.image_path ? '<span class="rs-sale-meta" style="color:var(--accent)">📎</span>' : ''}
+          </div>
+        </div>
+      `).join("");
+
+      const totalPages = Math.ceil(filtered.length / EXP_PAGE_SIZE);
+      const currentPage = Math.floor(expPageOffset / EXP_PAGE_SIZE) + 1;
+      if (totalPages > 1) {
+        pagEl.innerHTML = `
+          <button class="rs-pager-btn" onclick="expGotoPage(-1)" ${expPageOffset === 0 ? 'disabled' : ''}>Previous</button>
+          <span style="font-size:13px;color:var(--text-tertiary);align-self:center">${currentPage} / ${totalPages}</span>
+          <button class="rs-pager-btn" onclick="expGotoPage(1)" ${expPageOffset + EXP_PAGE_SIZE >= filtered.length ? 'disabled' : ''}>Next</button>
+        `;
+      } else {
+        pagEl.innerHTML = '';
+      }
+    }
+
+    function expGotoPage(dir) {
+      const all = window._expData || [];
+      expPageOffset += dir * EXP_PAGE_SIZE;
+      if (expPageOffset < 0) expPageOffset = 0;
+      if (expPageOffset >= all.length) expPageOffset = Math.max(0, all.length - EXP_PAGE_SIZE);
+      expRenderList();
+      document.getElementById("exp-list").scrollIntoView({ behavior: "smooth" });
+    }
+
+    async function expDelete(id, btn) {
+      // Two-tap confirm like sales
+      if (!btn.dataset.armed) {
+        btn.dataset.armed = "1";
+        btn.textContent = "?";
+        btn.style.color = "#ff4444";
+        setTimeout(() => { btn.dataset.armed = ""; btn.textContent = "\u2715"; btn.style.color = ""; }, 3000);
+        return;
+      }
+      try {
+        const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
+        const resp = await fetch(base + "/api/expenses/" + id, { method: "DELETE" });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+
+        // Remove from local cache
+        window._expData = (window._expData || []).filter(e => String(e.id) !== String(id));
+        const total = window._expData.reduce((s, e) => s + (e.total_amount || 0), 0);
+        document.getElementById("exp-total-badge").textContent = window._expData.length + ' expenses \u00B7 ' + total.toFixed(2) + ' EUR';
+
+        const row = document.getElementById("exp-row-" + id);
+        if (row) { row.style.opacity = "0"; row.style.transition = "opacity 0.3s"; setTimeout(() => expRenderList(), 300); }
+        expToast("Expense deleted");
+      } catch(e) {
+        expToast("Error: " + e.message, true);
+      }
+    }
+
+    function expToast(msg, isError) {
+      const t = document.getElementById("exp-toast");
+      if (!t) return;
+      t.textContent = msg;
+      t.className = "rs-toast show" + (isError ? " error" : "");
+      setTimeout(() => { t.className = "rs-toast"; }, 3000);
+    }
+
+    function expDownloadExcel() {
+      const expenses = window._expData || [];
+      if (!expenses.length) { expToast('No expenses to export', true); return; }
+
+      const headers = ['ID','Date','Vendor','Total (EUR)','Notes','Image'];
+      const rows = expenses.map(e => [
+        e.id,
+        e.expense_date || '',
+        (e.vendor || '').replace(/"/g, '""'),
+        e.total_amount != null ? e.total_amount.toFixed(2) : '',
+        (e.notes || '').replace(/"/g, '""'),
+        e.image_path || ''
+      ]);
+      const csv = '\uFEFF' + [headers, ...rows].map(r => r.map(c => '"' + c + '"').join(',')).join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'expenses_export_' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     // ── Record Sale (dedicated mobile-friendly page) ────────────────

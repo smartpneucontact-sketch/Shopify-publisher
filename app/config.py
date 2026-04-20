@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # ── Product Manager Service ──────────────────────────────────────
     PRODUCT_MANAGER_SERVICE_URL: str = "http://smartpneu-product-manager.railway.internal:5000"
 
+    # ── Anthropic (Claude API for invoice reading) ────────────────
+    ANTHROPIC_API_KEY: str = ""
+
     # ── Data Directory (persistent volume on Railway) ──────────────
     DATA_DIR: str = "/data"
 

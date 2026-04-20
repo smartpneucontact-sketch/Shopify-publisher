@@ -102,6 +102,26 @@ class SalesDB:
                 "CREATE INDEX IF NOT EXISTS idx_sales_sold_at ON sales(sold_at)"
             )
 
+            # Expenses table
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS expenses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    expense_date TEXT NOT NULL,
+                    vendor TEXT,
+                    description TEXT,
+                    total_amount REAL NOT NULL,
+                    currency TEXT DEFAULT 'EUR',
+                    image_path TEXT,
+                    notes TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date)"
+            )
+
             # Track which SKUs have been unlisted via sync
             await db.execute(
                 """
@@ -523,6 +543,57 @@ class SalesDB:
 
             # Fetch and return the updated record
             return await self._get_sale_by_id(db, sale_id)
+
+    # ── Expenses ────────────────────────────────────────────────────
+
+    async def add_expense(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Record a new expense."""
+        if not data.get("total_amount"):
+            raise ValueError("total_amount is required")
+        if not data.get("expense_date"):
+            raise ValueError("expense_date is required")
+
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                """
+                INSERT INTO expenses (expense_date, vendor, description, total_amount, currency, image_path, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    data["expense_date"],
+                    data.get("vendor", ""),
+                    data.get("description", ""),
+                    data["total_amount"],
+                    data.get("currency", "EUR"),
+                    data.get("image_path", ""),
+                    data.get("notes", ""),
+                ),
+            )
+            await db.commit()
+            expense_id = cursor.lastrowid
+
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM expenses WHERE id = ?", (expense_id,))
+            row = await cur.fetchone()
+            return dict(row) if row else {}
+
+    async def list_expenses(self, limit: int = 500, offset: int = 0) -> List[Dict[str, Any]]:
+        """List expenses ordered by date descending."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT * FROM expenses ORDER BY expense_date DESC, id DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            )
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    async def delete_expense(self, expense_id: int) -> bool:
+        """Delete an expense by ID."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+            await db.commit()
+            return cursor.rowcount > 0
 
 
 # Singleton instance — uses persistent volume path from config

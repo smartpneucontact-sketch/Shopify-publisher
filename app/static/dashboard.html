@@ -1563,7 +1563,7 @@
           <div class="rs-sale-line2">
             <span class="rs-sale-date">${e.expense_date ? new Date(e.expense_date + 'T00:00:00').toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) : ''}</span>
             ${e.notes ? '<span class="rs-sale-meta">' + e.notes + '</span>' : ''}
-            ${e.image_path ? '<span class="rs-sale-meta" style="color:var(--accent)">📎</span>' : ''}
+            ${e.image_path ? '<a href="javascript:void(0)" onclick="expViewInvoice(\'' + e.image_path + '\')" class="rs-sale-meta" style="color:var(--accent);text-decoration:none;cursor:pointer">📎 View</a>' : ''}
           </div>
         </div>
       `).join("");
@@ -1623,6 +1623,12 @@
       t.textContent = msg;
       t.className = "rs-toast show" + (isError ? " error" : "");
       setTimeout(() => { t.className = "rs-toast"; }, 3000);
+    }
+
+    function expViewInvoice(filename) {
+      const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
+      const url = base + "/api/expenses/invoice/" + encodeURIComponent(filename);
+      window.open(url, "_blank");
     }
 
     function expDownloadExcel() {

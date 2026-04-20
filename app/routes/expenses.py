@@ -10,6 +10,7 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.config import settings
@@ -143,6 +144,20 @@ async def parse_invoice(file: UploadFile = File(...)):
             "image_path": filename,
             "error": f"Could not parse invoice: {str(e)}",
         }
+
+
+# ── Serve invoice images ────────────────────────────────────────────
+
+@router.get("/invoice/{filename}")
+async def get_invoice(filename: str):
+    """Serve a saved invoice image."""
+    # Prevent path traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    filepath = os.path.join(INVOICES_DIR, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return FileResponse(filepath)
 
 
 # ── CRUD ────────────────────────────────────────────────────────────

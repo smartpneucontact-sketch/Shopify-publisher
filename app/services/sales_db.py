@@ -623,8 +623,6 @@ class SalesDB:
 
     async def add_listing(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Record a new listing."""
-        if not data.get("sku"):
-            raise ValueError("sku is required")
         if not data.get("platform"):
             raise ValueError("platform is required")
 

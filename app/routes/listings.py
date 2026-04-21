@@ -146,21 +146,22 @@ async def scrape_and_sync():
         scraped_urls.add(url)
 
         if url in existing_by_url:
-            # Already tracked — could update price/title if needed
             updated += 1
         else:
-            # New listing — add it
-            await sales_db.add_listing({
-                "sku": item.get("sku", ""),
-                "platform": "kleinanzeigen",
-                "title": item.get("title", ""),
-                "price": item.get("price"),
-                "currency": "EUR",
-                "listing_url": url,
-                "status": "active",
-                "listed_at": datetime.utcnow().isoformat(),
-            })
-            added += 1
+            try:
+                await sales_db.add_listing({
+                    "sku": item.get("sku", ""),
+                    "platform": "kleinanzeigen",
+                    "title": item.get("title", ""),
+                    "price": item.get("price"),
+                    "currency": "EUR",
+                    "listing_url": url,
+                    "status": "active",
+                    "listed_at": datetime.utcnow().isoformat(),
+                })
+                added += 1
+            except Exception as e:
+                logger.warning(f"Failed to add listing {url}: {e}")
 
     # Mark listings no longer on KA as expired
     for url, listing in existing_by_url.items():

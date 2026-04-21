@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # ── Anthropic (Claude API for invoice reading) ────────────────
     ANTHROPIC_API_KEY: str = ""
 
+    # ── Kleinanzeigen Scraper ──────────────────────────────────────
+    KLEINANZEIGEN_USER_ID: str = ""  # Your seller user ID
+
     # ── Data Directory (persistent volume on Railway) ──────────────
     DATA_DIR: str = "/data"
 

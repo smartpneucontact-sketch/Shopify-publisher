@@ -1400,6 +1400,9 @@
             <div class="rs-stat-card"><div class="rs-stat-value" style="color:#ff6e14">${lbcCount}</div><div class="rs-stat-label">Leboncoin</div></div>
           </div>
 
+          <button class="rs-submit" id="lst-sync-btn" onclick="lstSyncKleinanzeigen()" style="margin-bottom:16px;font-size:14px;padding:12px">Sync from Kleinanzeigen</button>
+          <div id="lst-sync-status" style="display:none;text-align:center;padding:8px;margin-bottom:12px;font-size:13px;color:var(--text-tertiary)"></div>
+
           <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
             <button class="rs-chart-pill active" data-lstf="all" onclick="lstSetFilter(this)">All</button>
             <button class="rs-chart-pill" data-lstf="active" onclick="lstSetFilter(this)">Active</button>
@@ -1569,6 +1572,40 @@
       t.textContent = msg;
       document.querySelector(".rs-page")?.appendChild(t);
       setTimeout(() => { t.className = "rs-toast"; setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    async function lstSyncKleinanzeigen() {
+      const btn = document.getElementById("lst-sync-btn");
+      const status = document.getElementById("lst-sync-status");
+      btn.disabled = true;
+      btn.textContent = "Syncing...";
+      status.style.display = "block";
+      status.innerHTML = '<span class="pulse">Scraping Kleinanzeigen — this may take a minute...</span>';
+
+      try {
+        const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
+        const resp = await fetch(base + "/api/listings/scrape-kleinanzeigen", { method: "POST" });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || "HTTP " + resp.status);
+        }
+        const data = await resp.json();
+        status.style.color = "var(--accent)";
+        status.textContent = `Found ${data.found_on_ka} ads on KA — ${data.added} new, ${data.already_tracked} already tracked, ${data.expired} expired`;
+
+        // Refresh list
+        const r = await apiFetch("/api/listings/?limit=500");
+        window._lstData = Array.isArray(r) ? r : [];
+        document.getElementById("lst-total-badge").textContent = window._lstData.length + ' listings';
+        lstPageOffset = 0;
+        lstRenderList();
+      } catch(e) {
+        status.style.color = "#ff4444";
+        status.textContent = "Sync failed: " + e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Sync from Kleinanzeigen";
+      }
     }
 
     function lstDownloadExcel() {

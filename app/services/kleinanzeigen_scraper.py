@@ -219,40 +219,23 @@ def _scrape_sync(user_id: str) -> Dict[str, Any]:
                 return {"error": f"Failed to fetch profile: {str(e)}", "listings": []}
             break
 
-    logger.info(f"Found {len(all_ads)} ads total, now fetching SKUs...")
+    logger.info(f"Found {len(all_ads)} ads total")
 
-    # Step 2: Fetch each ad detail page to extract SKU
+    # Build listings from profile data (no individual ad fetches — too slow)
     listings = []
-    for i, ad in enumerate(all_ads):
-        sku = ""
+    for ad in all_ads:
         ad_url = ad.get("url", "")
-
-        if ad_url:
-            full_url = BASE_URL + ad_url if ad_url.startswith("/") else ad_url
-            try:
-                resp = scraper.get(full_url, timeout=20)
-                if resp.status_code == 200:
-                    detail_parser = AdDetailParser()
-                    detail_parser.feed(resp.text)
-                    sku = extract_sku(detail_parser.description)
-            except Exception as e:
-                logger.error(f"Error fetching ad detail {i}: {e}")
-
-            if i < len(all_ads) - 1:
-                time.sleep(1.5)
-        else:
-            full_url = ""
+        full_url = BASE_URL + ad_url if ad_url.startswith("/") else ad_url
 
         listing = {
             "title": ad.get("title", ""),
             "price": parse_price(ad.get("price", "")),
             "url": full_url,
             "ad_id": extract_ad_id(ad_url),
-            "sku": sku,
+            "sku": "",  # SKU matching done in sync logic via title/existing data
             "platform": "kleinanzeigen",
         }
         listings.append(listing)
-        logger.info(f"  [{i+1}/{len(all_ads)}] SKU={sku or '?'} — {listing['title'][:60]}")
 
     return {
         "user_id": user_id,

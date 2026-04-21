@@ -359,6 +359,7 @@
       { id: "ebay", label: "eBay", icon: "ebay" },
       { id: "record-sale", label: "Record Sale", icon: "banknote" },
       { id: "expenses", label: "Expenses", icon: "receipt" },
+      { id: "listings", label: "Listings", icon: "megaphone" },
       { id: "orders", label: "Orders", icon: "shopping-bag" },
       { id: "customers", label: "Customers", icon: "users" },
       { id: "inventory", label: "Inventory", icon: "box" },
@@ -378,6 +379,7 @@
       "ebay": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 8l3 3-3 3"/><line x1="13" y1="13" x2="17" y2="13"/></svg>`,
       "banknote": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 6v12"/><path d="M18 6v12"/></svg>`,
       "receipt": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2-3-2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>`,
+      "megaphone": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 11-5.8-1.6"/></svg>`,
     };
 
     // ── API ─────────────────────────────────────────────────────────
@@ -581,6 +583,7 @@
         case "ebay": return renderEbay(el);
         case "record-sale": return renderRecordSale(el);
         case "expenses": return renderExpenses(el);
+        case "listings": return renderListings(el);
         case "orders": return renderOrders(el);
         case "customers": return renderCustomers(el);
         case "inventory": return renderInventory(el);
@@ -1367,6 +1370,231 @@
             }).join("")}
           </tbody></table></div>`;
       } catch (e) { el.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
+    }
+
+    // ── LISTINGS PAGE ─────────────────────────────────────────────
+    let lstPageOffset = 0;
+    const LST_PAGE_SIZE = 15;
+    let _lstFilter = 'all'; // all, active, sold, expired
+
+    async function renderListings(el) {
+      el.innerHTML = `<div style="display:flex;justify-content:center;padding:20px"><span class="pulse" style="color:var(--text-tertiary)">Loading...</span></div>`;
+      lstPageOffset = 0;
+      _lstFilter = 'all';
+      let allListings = [];
+      try { const r = await apiFetch("/api/listings/?limit=500"); allListings = Array.isArray(r) ? r : []; } catch(e) {}
+      window._lstData = allListings;
+
+      const active = allListings.filter(l => l.status === 'active').length;
+      const sold = allListings.filter(l => l.status === 'sold').length;
+      const kaCount = allListings.filter(l => l.platform === 'kleinanzeigen').length;
+      const lbcCount = allListings.filter(l => l.platform === 'leboncoin').length;
+
+      el.innerHTML = `
+        <div class="rs-page fade-in">
+          <div class="rs-stats-grid" id="lst-stats-grid">
+            <div class="rs-stat-card"><div class="rs-stat-value">${allListings.length}</div><div class="rs-stat-label">Total</div></div>
+            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#8BC34A">${active}</div><div class="rs-stat-label">Active</div></div>
+            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#ff6b6b">${sold}</div><div class="rs-stat-label">Sold</div></div>
+            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#86b817">${kaCount}</div><div class="rs-stat-label">Kleinanzeigen</div></div>
+            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#ff6e14">${lbcCount}</div><div class="rs-stat-label">Leboncoin</div></div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+            <button class="rs-chart-pill active" data-lstf="all" onclick="lstSetFilter(this)">All</button>
+            <button class="rs-chart-pill" data-lstf="active" onclick="lstSetFilter(this)">Active</button>
+            <button class="rs-chart-pill" data-lstf="sold" onclick="lstSetFilter(this)">Sold</button>
+            <button class="rs-chart-pill" data-lstf="expired" onclick="lstSetFilter(this)">Expired</button>
+          </div>
+
+          <input type="text" id="lst-search" class="rs-search" placeholder="Search SKU..." inputmode="numeric" oninput="lstOnSearch(this)">
+
+          <div class="rs-recent">
+            <div class="rs-recent-header">
+              <h3>Listings</h3>
+              <span class="rs-total-badge" id="lst-total-badge">${allListings.length} listings</span>
+              <button class="rs-download-btn" onclick="lstDownloadExcel()" title="Download all listings as Excel">&#x2B07; Excel</button>
+            </div>
+            <div id="lst-list"></div>
+            <div id="lst-pagination" style="display:flex;justify-content:center;gap:12px;padding:16px 0"></div>
+          </div>
+        </div>
+      `;
+
+      lstRenderList();
+    }
+
+    function lstGetFiltered() {
+      let data = window._lstData || [];
+      if (_lstFilter !== 'all') data = data.filter(l => l.status === _lstFilter);
+      const q = (window._lstSearchQuery || '').trim().toLowerCase();
+      if (q) data = data.filter(l => (l.sku || '').toLowerCase().includes(q));
+      return data;
+    }
+
+    function lstSetFilter(btn) {
+      document.querySelectorAll('[data-lstf]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _lstFilter = btn.dataset.lstf;
+      lstPageOffset = 0;
+      lstRenderList();
+    }
+
+    function lstOnSearch(input) {
+      window._lstSearchQuery = input.value;
+      lstPageOffset = 0;
+      lstRenderList();
+    }
+
+    function lstPlatformBadge(platform) {
+      const colors = { kleinanzeigen: '#86b817', leboncoin: '#ff6e14' };
+      const labels = { kleinanzeigen: 'KA', leboncoin: 'LBC' };
+      const c = colors[platform] || 'var(--text-tertiary)';
+      return '<span class="rs-sale-ch" style="color:' + c + '">' + (labels[platform] || platform) + '</span>';
+    }
+
+    function lstStatusBadge(status) {
+      const colors = { active: '#8BC34A', sold: '#ff6b6b', expired: '#888' };
+      const c = colors[status] || '#888';
+      return '<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:' + c + '22;color:' + c + ';font-weight:500">' + status + '</span>';
+    }
+
+    function lstRenderList() {
+      const filtered = lstGetFiltered();
+      const page = filtered.slice(lstPageOffset, lstPageOffset + LST_PAGE_SIZE);
+      const listEl = document.getElementById("lst-list");
+      const pagEl = document.getElementById("lst-pagination");
+      if (!listEl) return;
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="rs-empty">' + (_lstFilter !== 'all' || window._lstSearchQuery ? 'No match' : 'No listings yet — they appear here when you use the Kleinanzeigen or Leboncoin tool') + '</div>';
+        pagEl.innerHTML = '';
+        return;
+      }
+
+      listEl.innerHTML = page.map(l => `
+        <div class="rs-sale-row" id="lst-row-${l.id}">
+          <div class="rs-sale-line1">
+            <span class="rs-sale-sku">${l.sku || '\u2014'}</span>
+            <span class="rs-sale-price">${l.price ? l.price.toFixed(2) + ' \u20AC' : '\u2014'}</span>
+            <button class="rs-del-btn" onclick="lstDelete('${l.id}', this)" title="Delete">\u2715</button>
+          </div>
+          <div class="rs-sale-line2">
+            ${lstPlatformBadge(l.platform)}
+            ${lstStatusBadge(l.status)}
+            <span class="rs-sale-date">${l.listed_at ? new Date(l.listed_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) : ''}</span>
+            ${l.title ? '<span class="rs-sale-meta" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + l.title.slice(0, 50) + '</span>' : ''}
+            ${l.listing_url ? '<a href="' + l.listing_url + '" target="_blank" class="rs-sale-meta" style="color:var(--accent);text-decoration:none">\u{1F517}</a>' : ''}
+            <select style="font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer" onchange="lstChangeStatus('${l.id}', this.value)">
+              <option value="active" ${l.status === 'active' ? 'selected' : ''}>Active</option>
+              <option value="sold" ${l.status === 'sold' ? 'selected' : ''}>Sold</option>
+              <option value="expired" ${l.status === 'expired' ? 'selected' : ''}>Expired</option>
+            </select>
+          </div>
+        </div>
+      `).join("");
+
+      const totalPages = Math.ceil(filtered.length / LST_PAGE_SIZE);
+      const currentPage = Math.floor(lstPageOffset / LST_PAGE_SIZE) + 1;
+      if (totalPages > 1) {
+        pagEl.innerHTML = `
+          <button class="rs-pager-btn" onclick="lstGotoPage(-1)" ${lstPageOffset === 0 ? 'disabled' : ''}>Previous</button>
+          <span style="font-size:13px;color:var(--text-tertiary);align-self:center">${currentPage} / ${totalPages}</span>
+          <button class="rs-pager-btn" onclick="lstGotoPage(1)" ${lstPageOffset + LST_PAGE_SIZE >= filtered.length ? 'disabled' : ''}>Next</button>
+        `;
+      } else {
+        pagEl.innerHTML = '';
+      }
+    }
+
+    function lstGotoPage(dir) {
+      const all = lstGetFiltered();
+      lstPageOffset += dir * LST_PAGE_SIZE;
+      if (lstPageOffset < 0) lstPageOffset = 0;
+      if (lstPageOffset >= all.length) lstPageOffset = Math.max(0, all.length - LST_PAGE_SIZE);
+      lstRenderList();
+      document.getElementById("lst-list").scrollIntoView({ behavior: "smooth" });
+    }
+
+    async function lstChangeStatus(id, newStatus) {
+      try {
+        const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
+        const resp = await fetch(base + "/api/listings/" + id + "/status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+
+        // Update local cache
+        const item = (window._lstData || []).find(l => String(l.id) === String(id));
+        if (item) item.status = newStatus;
+        lstToast("Status updated to " + newStatus);
+      } catch(e) {
+        lstToast("Error: " + e.message, true);
+      }
+    }
+
+    async function lstDelete(id, btn) {
+      if (!btn.dataset.armed) {
+        btn.dataset.armed = "1";
+        btn.textContent = "?";
+        btn.style.color = "#ff4444";
+        setTimeout(() => { btn.dataset.armed = ""; btn.textContent = "\u2715"; btn.style.color = ""; }, 3000);
+        return;
+      }
+      try {
+        const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
+        const resp = await fetch(base + "/api/listings/" + id, { method: "DELETE" });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+
+        window._lstData = (window._lstData || []).filter(l => String(l.id) !== String(id));
+        document.getElementById("lst-total-badge").textContent = window._lstData.length + ' listings';
+
+        const row = document.getElementById("lst-row-" + id);
+        if (row) { row.style.opacity = "0"; row.style.transition = "opacity 0.3s"; setTimeout(() => lstRenderList(), 300); }
+        lstToast("Listing deleted");
+      } catch(e) {
+        lstToast("Error: " + e.message, true);
+      }
+    }
+
+    function lstToast(msg, isError) {
+      // Reuse the global toast pattern
+      const existing = document.getElementById("lst-toast");
+      if (existing) { existing.remove(); }
+      const t = document.createElement("div");
+      t.id = "lst-toast";
+      t.className = "rs-toast show" + (isError ? " error" : "");
+      t.textContent = msg;
+      document.querySelector(".rs-page")?.appendChild(t);
+      setTimeout(() => { t.className = "rs-toast"; setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    function lstDownloadExcel() {
+      const listings = window._lstData || [];
+      if (!listings.length) { lstToast('No listings to export', true); return; }
+
+      const headers = ['ID','SKU','Platform','Title','Price (EUR)','Status','Listed At','URL'];
+      const rows = listings.map(l => [
+        l.id,
+        l.sku || '',
+        l.platform || '',
+        (l.title || '').replace(/"/g, '""'),
+        l.price != null ? l.price.toFixed(2) : '',
+        l.status || '',
+        l.listed_at || '',
+        l.listing_url || ''
+      ]);
+      const csv = '\uFEFF' + [headers, ...rows].map(r => r.map(c => '"' + c + '"').join(',')).join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'listings_export_' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     // ── EXPENSES PAGE ──────────────────────────────────────────────

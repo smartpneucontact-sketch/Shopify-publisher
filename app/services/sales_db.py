@@ -122,6 +122,30 @@ class SalesDB:
                 "CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date)"
             )
 
+            # Listings table (Kleinanzeigen, Leboncoin, etc.)
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS listings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sku TEXT NOT NULL,
+                    platform TEXT NOT NULL,
+                    title TEXT,
+                    price REAL,
+                    currency TEXT DEFAULT 'EUR',
+                    listing_url TEXT,
+                    status TEXT DEFAULT 'active',
+                    listed_at TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_listings_sku ON listings(sku)"
+            )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_listings_platform ON listings(platform)"
+            )
+
             # Track which SKUs have been unlisted via sync
             await db.execute(
                 """
@@ -592,6 +616,84 @@ class SalesDB:
         """Delete an expense by ID."""
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+            await db.commit()
+            return cursor.rowcount > 0
+
+    # ── Listings ────────────────────────────────────────────────────
+
+    async def add_listing(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Record a new listing."""
+        if not data.get("sku"):
+            raise ValueError("sku is required")
+        if not data.get("platform"):
+            raise ValueError("platform is required")
+
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                """
+                INSERT INTO listings (sku, platform, title, price, currency, listing_url, status, listed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    data["sku"],
+                    data["platform"],
+                    data.get("title", ""),
+                    data.get("price"),
+                    data.get("currency", "EUR"),
+                    data.get("listing_url", ""),
+                    data.get("status", "active"),
+                    data.get("listed_at", datetime.utcnow().isoformat()),
+                ),
+            )
+            await db.commit()
+            listing_id = cursor.lastrowid
+
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM listings WHERE id = ?", (listing_id,))
+            row = await cur.fetchone()
+            return dict(row) if row else {}
+
+    async def list_listings(self, limit: int = 500, offset: int = 0, platform: str = None, status: str = None) -> List[Dict[str, Any]]:
+        """List listings ordered by date descending."""
+        query = "SELECT * FROM listings WHERE 1=1"
+        params = []
+        if platform:
+            query += " AND platform = ?"
+            params.append(platform)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY listed_at DESC, id DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(query, params)
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    async def update_listing_status(self, listing_id: int, status: str) -> bool:
+        """Update listing status (active, sold, expired)."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "UPDATE listings SET status = ? WHERE id = ?", (status, listing_id)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def update_listing_url(self, listing_id: int, url: str) -> bool:
+        """Update listing URL."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "UPDATE listings SET listing_url = ? WHERE id = ?", (url, listing_id)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def delete_listing(self, listing_id: int) -> bool:
+        """Delete a listing by ID."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("DELETE FROM listings WHERE id = ?", (listing_id,))
             await db.commit()
             return cursor.rowcount > 0
 

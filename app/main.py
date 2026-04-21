@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.routes import products, orders, customers, inventory, health, studio, ebay
-from app.routes import sales, events, gateway, notifications, expenses
+from app.routes import sales, events, gateway, notifications, expenses, listings
 from app.services.sales_db import sales_db
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -65,6 +65,7 @@ app.include_router(events.router, prefix="/api/events", tags=["Events"])
 app.include_router(gateway.router, prefix="/api/gateway", tags=["Gateway"])
 app.include_router(notifications.router, prefix="/api", tags=["Notifications"])
 app.include_router(expenses.router, prefix="/api/expenses", tags=["Expenses"])
+app.include_router(listings.router, prefix="/api/listings", tags=["Listings"])
 
 
 @app.get("/")

@@ -88,6 +88,27 @@ async def delete_listing(listing_id: int):
 
 # ── Kleinanzeigen Scraper ───────────────────────────────────────────
 
+@router.get("/scrape-test")
+async def scrape_test():
+    """Debug: test scrape without syncing to DB. Returns raw result."""
+    try:
+        result = await scrape_kleinanzeigen()
+        return {
+            "ok": True,
+            "error": result.get("error"),
+            "count": result.get("count", 0),
+            "first_3": result.get("listings", [])[:3],
+            "debug_snippet": result.get("debug_snippet"),
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "ok": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
+
+
 @router.post("/scrape-kleinanzeigen")
 async def scrape_and_sync():
     """

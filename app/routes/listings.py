@@ -100,6 +100,9 @@ async def scrape_and_sync():
         result = await scrape_kleinanzeigen()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Scraper crashed")
+        raise HTTPException(status_code=500, detail=f"Scraper error: {str(e)}")
 
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])

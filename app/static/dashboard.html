@@ -1381,6 +1381,22 @@
     let _lstFilter = 'all'; // all, active, sold, expired
     let _lstPlatform = ''; // kleinanzeigen or leboncoin
 
+    function lstSaveLastSync(platform) {
+      try { localStorage.setItem('lst_sync_' + platform, new Date().toISOString()); } catch(e) {}
+    }
+    function lstGetLastSync(platform) {
+      try {
+        const ts = localStorage.getItem('lst_sync_' + platform);
+        if (!ts) return 'Never synced';
+        const d = new Date(ts);
+        return 'Last sync: ' + d.toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'}) + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
+      } catch(e) { return ''; }
+    }
+    function lstUpdateSyncBadge(platform) {
+      const el = document.getElementById('lst-last-sync');
+      if (el) el.textContent = lstGetLastSync(platform);
+    }
+
     async function renderListings(el, platform) {
       _lstPlatform = platform;
       el.innerHTML = `<div style="display:flex;justify-content:center;padding:20px"><span class="pulse" style="color:var(--text-tertiary)">Loading...</span></div>`;
@@ -1411,6 +1427,7 @@
           </div>
 
           ${syncBtn}
+          <div id="lst-last-sync" style="text-align:center;padding:4px 0 8px;font-size:11px;color:var(--text-tertiary)">${lstGetLastSync(platform)}</div>
           <div id="lst-sync-status" style="display:none;text-align:center;padding:8px;margin-bottom:12px;font-size:13px;color:var(--text-tertiary)"></div>
 
           <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;margin-top:16px">
@@ -1602,6 +1619,8 @@
         const data = await resp.json();
         status.style.color = "var(--accent)";
         status.textContent = `Found ${data.found_on_ka} ads on KA — ${data.added} new, ${data.already_tracked} already tracked, ${data.expired} expired`;
+        lstSaveLastSync('kleinanzeigen');
+        lstUpdateSyncBadge('kleinanzeigen');
 
         // Refresh list
         const r = await apiFetch("/api/listings/?limit=500&platform=kleinanzeigen");
@@ -1638,6 +1657,8 @@
         const data = await resp.json();
         status.style.color = "var(--accent)";
         status.textContent = `LBC: ${data.found_on_lbc} ads — ${data.added} new, ${data.already_tracked} tracked, ${data.expired} expired`;
+        lstSaveLastSync('leboncoin');
+        lstUpdateSyncBadge('leboncoin');
 
         // Refresh list
         const r = await apiFetch("/api/listings/?limit=500&platform=leboncoin");

@@ -1381,16 +1381,19 @@
     let _lstFilter = 'all'; // all, active, sold, expired
     let _lstPlatform = ''; // kleinanzeigen or leboncoin
 
-    function lstSaveLastSync(platform) {
-      try { localStorage.setItem('lst_sync_' + platform, new Date().toISOString()); } catch(e) {}
-    }
     function lstGetLastSync(platform) {
-      try {
-        const ts = localStorage.getItem('lst_sync_' + platform);
-        if (!ts) return 'Never synced';
-        const d = new Date(ts);
-        return 'Last sync: ' + d.toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'}) + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
-      } catch(e) { return ''; }
+      const data = window._lstData || [];
+      if (!data.length) return 'Never synced';
+      // Find the most recent listed_at
+      let latest = null;
+      for (const l of data) {
+        if (l.listed_at) {
+          const d = new Date(l.listed_at);
+          if (!latest || d > latest) latest = d;
+        }
+      }
+      if (!latest) return 'Never synced';
+      return 'Last sync: ' + latest.toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'}) + ' ' + latest.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
     }
     function lstUpdateSyncBadge(platform) {
       const el = document.getElementById('lst-last-sync');
@@ -1619,7 +1622,6 @@
         const data = await resp.json();
         status.style.color = "var(--accent)";
         status.textContent = `Found ${data.found_on_ka} ads on KA — ${data.added} new, ${data.already_tracked} already tracked, ${data.expired} expired`;
-        lstSaveLastSync('kleinanzeigen');
         lstUpdateSyncBadge('kleinanzeigen');
 
         // Refresh list
@@ -1657,7 +1659,6 @@
         const data = await resp.json();
         status.style.color = "var(--accent)";
         status.textContent = `LBC: ${data.found_on_lbc} ads — ${data.added} new, ${data.already_tracked} tracked, ${data.expired} expired`;
-        lstSaveLastSync('leboncoin');
         lstUpdateSyncBadge('leboncoin');
 
         // Refresh list

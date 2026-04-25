@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 
 from app.services.sales_db import sales_db
 from app.services.kleinanzeigen_scraper import scrape_kleinanzeigen
-from app.services.leboncoin_scraper import scrape_leboncoin
 
 logger = logging.getLogger(__name__)
 
@@ -179,73 +178,70 @@ async def scrape_and_sync():
     }
 
 
-# ── Leboncoin Scraper ──────────────────────────────────────────────
+# ── Leboncoin Import (bookmarklet) ─────────────────────────────────
 
-class LeboncoinScrapeRequest(BaseModel):
-    ad_urls: list[str] = Field(default=[], description="List of Leboncoin ad URLs to scrape")
+class LeboncoinListing(BaseModel):
+    title: str = ""
+    sku: str = ""
+    price: Optional[float] = None
+
+class LeboncoinImportRequest(BaseModel):
+    listings: list[LeboncoinListing] = Field(..., description="Listings extracted by bookmarklet")
 
 
-@router.post("/scrape-leboncoin")
-async def scrape_and_sync_leboncoin(body: LeboncoinScrapeRequest = LeboncoinScrapeRequest()):
+@router.post("/import-leboncoin")
+async def import_leboncoin(body: LeboncoinImportRequest):
     """
-    Scrape Leboncoin ad pages, sync listings to DB.
-    - Tries search page first, falls back to individual ad pages
-    - New listings (by URL) are added as 'active'
-    - Existing listings that disappear are marked 'expired'
+    Import Leboncoin listings sent by the browser bookmarklet.
+    Syncs by SKU: new ones added, missing ones expired.
     """
-    try:
-        result = await scrape_leboncoin(ad_urls=body.ad_urls if body.ad_urls else None)
-    except Exception as e:
-        logger.exception("Leboncoin scraper crashed")
-        raise HTTPException(status_code=500, detail=f"Scraper error: {str(e)}")
-
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-
-    scraped = result.get("listings", [])
+    scraped = body.listings
 
     # Get existing LBC listings from DB
     existing = await sales_db.list_listings(limit=5000, platform="leboncoin")
-    existing_by_url = {l["listing_url"]: l for l in existing if l.get("listing_url")}
+    existing_by_sku = {l["sku"]: l for l in existing if l.get("sku")}
 
-    scraped_urls = set()
+    scraped_skus = set()
     added = 0
     updated = 0
     expired = 0
 
     for item in scraped:
-        url = item.get("url", "")
-        if not url:
+        sku = item.sku.strip()
+        if not sku:
             continue
-        scraped_urls.add(url)
+        scraped_skus.add(sku)
 
-        if url in existing_by_url:
+        if sku in existing_by_sku:
+            # Update price/title if changed
+            ex = existing_by_sku[sku]
+            if ex.get("status") == "expired":
+                await sales_db.update_listing_status(ex["id"], "active")
             updated += 1
         else:
             try:
                 await sales_db.add_listing({
-                    "sku": item.get("sku", ""),
+                    "sku": sku,
                     "platform": "leboncoin",
-                    "title": item.get("title", ""),
-                    "price": item.get("price"),
+                    "title": item.title,
+                    "price": item.price,
                     "currency": "EUR",
-                    "listing_url": url,
+                    "listing_url": "",
                     "status": "active",
                     "listed_at": datetime.utcnow().isoformat(),
                 })
                 added += 1
             except Exception as e:
-                logger.warning(f"Failed to add LBC listing {url}: {e}")
+                logger.warning(f"Failed to add LBC listing SKU {sku}: {e}")
 
-    # Mark listings no longer found as expired
-    for url, listing in existing_by_url.items():
-        if url not in scraped_urls and listing.get("status") == "active":
+    # Mark listings no longer on LBC as expired
+    for sku, listing in existing_by_sku.items():
+        if sku not in scraped_skus and listing.get("status") == "active":
             await sales_db.update_listing_status(listing["id"], "expired")
             expired += 1
 
     return {
-        "scraped_at": result.get("scraped_at"),
-        "method": result.get("method", "unknown"),
+        "imported_at": datetime.utcnow().isoformat(),
         "found_on_lbc": len(scraped),
         "added": added,
         "already_tracked": updated,

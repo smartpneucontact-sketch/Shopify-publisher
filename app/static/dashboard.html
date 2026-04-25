@@ -1402,7 +1402,7 @@
 
           <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
             <button class="rs-submit" id="lst-sync-btn" onclick="lstSyncKleinanzeigen()" style="font-size:14px;padding:12px;flex:1;min-width:180px">Sync Kleinanzeigen</button>
-            <button class="rs-submit" id="lst-sync-lbc-btn" onclick="lstSyncLeboncoin()" style="font-size:14px;padding:12px;flex:1;min-width:180px;background:#ff6e14">Sync Leboncoin</button>
+            <button class="rs-submit" id="lst-sync-lbc-btn" onclick="lstShowBookmarklet()" style="font-size:14px;padding:12px;flex:1;min-width:180px;background:#ff6e14">Sync Leboncoin</button>
           </div>
           <div id="lst-sync-status" style="display:none;text-align:center;padding:8px;margin-bottom:12px;font-size:13px;color:var(--text-tertiary)"></div>
 
@@ -1611,20 +1611,18 @@
       }
     }
 
-    async function lstSyncLeboncoin() {
-      const btn = document.getElementById("lst-sync-lbc-btn");
+    async function lstImportLeboncoin(listings) {
+      // Called by the bookmarklet or manually with pre-extracted data
       const status = document.getElementById("lst-sync-status");
-      btn.disabled = true;
-      btn.textContent = "Syncing...";
       status.style.display = "block";
-      status.innerHTML = '<span class="pulse">Scraping Leboncoin — this may take a minute...</span>';
+      status.innerHTML = '<span class="pulse">Importing ' + listings.length + ' Leboncoin listings...</span>';
 
       try {
         const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : "";
-        const resp = await fetch(base + "/api/listings/scrape-leboncoin", {
+        const resp = await fetch(base + "/api/listings/import-leboncoin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({})
+          body: JSON.stringify({ listings })
         });
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({}));
@@ -1632,7 +1630,7 @@
         }
         const data = await resp.json();
         status.style.color = "var(--accent)";
-        status.textContent = `Found ${data.found_on_lbc} ads on LBC — ${data.added} new, ${data.already_tracked} already tracked, ${data.expired} expired`;
+        status.textContent = `LBC: ${data.found_on_lbc} ads — ${data.added} new, ${data.already_tracked} tracked, ${data.expired} expired`;
 
         // Refresh list
         const r = await apiFetch("/api/listings/?limit=500");
@@ -1642,11 +1640,25 @@
         lstRenderList();
       } catch(e) {
         status.style.color = "#ff4444";
-        status.textContent = "LBC sync failed: " + e.message;
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Sync Leboncoin";
+        status.textContent = "LBC import failed: " + e.message;
       }
+    }
+
+    function lstShowBookmarklet() {
+      const base = state.apiUrl ? state.apiUrl.replace(/\/$/, "") : window.location.origin;
+      const code = `javascript:void(function(){var d=document.querySelectorAll('tbody tr'),r=[];d.forEach(function(row){var c=row.querySelectorAll('td');if(c.length<4)return;var h=c[2].querySelector('h3'),p=c[2].querySelector('p.truncate'),pr=c[3].textContent.trim().replace(/[^0-9]/g,'');if(h){r.push({title:h.textContent.trim(),sku:p?p.textContent.trim():'',price:pr?parseInt(pr):null})}});if(!r.length){alert('No listings found on this page');return}fetch('${base}/api/listings/import-leboncoin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({listings:r})}).then(function(r){return r.json()}).then(function(d){alert('SmartPneu: '+d.found_on_lbc+' listings synced!\\n'+d.added+' new, '+d.already_tracked+' already tracked, '+d.expired+' expired')}).catch(function(e){alert('Error: '+e.message)})}())`;
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+      modal.innerHTML = `<div style="background:var(--bg-secondary);border-radius:12px;padding:24px;max-width:500px;width:90%">
+        <h3 style="margin:0 0 12px;color:var(--text-primary)">Bookmarklet Leboncoin</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin:0 0 16px">Glisse ce bouton dans ta barre de favoris Chrome, puis clique dessus quand tu es sur ta page "Mes annonces" Leboncoin :</p>
+        <div style="text-align:center;margin:16px 0">
+          <a href="${code}" style="display:inline-block;background:#ff6e14;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:14px;cursor:grab">📦 Sync LBC → SmartPneu</a>
+        </div>
+        <p style="color:var(--text-tertiary);font-size:11px;margin:8px 0 16px;text-align:center">Astuce: parcours toutes les pages sur Leboncoin et clique le bookmarklet sur chaque page</p>
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:10px;background:var(--bg-tertiary);border:none;border-radius:8px;color:var(--text-primary);cursor:pointer">Fermer</button>
+      </div>`;
+      document.body.appendChild(modal);
     }
 
     function lstDownloadExcel() {

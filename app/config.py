@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     # ── Kleinanzeigen Scraper ──────────────────────────────────────
     KLEINANZEIGEN_USER_ID: str = ""  # Your seller user ID
 
+    # ── Leboncoin Scraper ─────────────────────────────────────────
+    LEBONCOIN_USER_ID: str = ""      # UUID from ad page __NEXT_DATA__
+    LEBONCOIN_AD_URLS: str = ""      # Comma-separated ad URLs for scraping
+
     # ── Data Directory (persistent volume on Railway) ──────────────
     DATA_DIR: str = "/data"
 

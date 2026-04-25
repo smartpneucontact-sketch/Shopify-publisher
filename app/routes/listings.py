@@ -193,28 +193,34 @@ class LeboncoinImportRequest(BaseModel):
 async def import_leboncoin(body: LeboncoinImportRequest):
     """
     Import Leboncoin listings sent by the browser bookmarklet.
-    Syncs by SKU: new ones added, missing ones expired.
+    Syncs by unique key (SKU if available, otherwise title).
     """
     scraped = body.listings
 
     # Get existing LBC listings from DB
     existing = await sales_db.list_listings(limit=5000, platform="leboncoin")
-    existing_by_sku = {l["sku"]: l for l in existing if l.get("sku")}
+    # Build lookup by SKU and by title for items without SKU
+    existing_by_key = {}
+    for l in existing:
+        key = l.get("sku") if l.get("sku") else l.get("title", "")
+        if key:
+            existing_by_key[key] = l
 
-    scraped_skus = set()
+    scraped_keys = set()
     added = 0
     updated = 0
     expired = 0
 
     for item in scraped:
         sku = item.sku.strip()
-        if not sku:
+        title = item.title.strip()
+        key = sku if sku else title
+        if not key:
             continue
-        scraped_skus.add(sku)
+        scraped_keys.add(key)
 
-        if sku in existing_by_sku:
-            # Update price/title if changed
-            ex = existing_by_sku[sku]
+        if key in existing_by_key:
+            ex = existing_by_key[key]
             if ex.get("status") == "expired":
                 await sales_db.update_listing_status(ex["id"], "active")
             updated += 1
@@ -223,7 +229,7 @@ async def import_leboncoin(body: LeboncoinImportRequest):
                 await sales_db.add_listing({
                     "sku": sku,
                     "platform": "leboncoin",
-                    "title": item.title,
+                    "title": title,
                     "price": item.price,
                     "currency": "EUR",
                     "listing_url": "",
@@ -232,11 +238,11 @@ async def import_leboncoin(body: LeboncoinImportRequest):
                 })
                 added += 1
             except Exception as e:
-                logger.warning(f"Failed to add LBC listing SKU {sku}: {e}")
+                logger.warning(f"Failed to add LBC listing {key}: {e}")
 
     # Mark listings no longer on LBC as expired
-    for sku, listing in existing_by_sku.items():
-        if sku not in scraped_skus and listing.get("status") == "active":
+    for key, listing in existing_by_key.items():
+        if key not in scraped_keys and listing.get("status") == "active":
             await sales_db.update_listing_status(listing["id"], "expired")
             expired += 1
 

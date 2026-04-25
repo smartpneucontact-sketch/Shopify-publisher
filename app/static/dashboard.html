@@ -359,7 +359,8 @@
       { id: "ebay", label: "eBay", icon: "ebay" },
       { id: "record-sale", label: "Record Sale", icon: "banknote" },
       { id: "expenses", label: "Expenses", icon: "receipt" },
-      { id: "listings", label: "Listings", icon: "megaphone" },
+      { id: "listings-ka", label: "Listings KA", icon: "megaphone" },
+      { id: "listings-lbc", label: "Listings LBC", icon: "megaphone-lbc" },
       { id: "orders", label: "Orders", icon: "shopping-bag" },
       { id: "customers", label: "Customers", icon: "users" },
       { id: "inventory", label: "Inventory", icon: "box" },
@@ -380,6 +381,7 @@
       "banknote": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 6v12"/><path d="M18 6v12"/></svg>`,
       "receipt": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2-3-2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>`,
       "megaphone": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 11-5.8-1.6"/></svg>`,
+      "megaphone-lbc": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff6e14" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 11-5.8-1.6"/></svg>`,
     };
 
     // ── API ─────────────────────────────────────────────────────────
@@ -583,7 +585,8 @@
         case "ebay": return renderEbay(el);
         case "record-sale": return renderRecordSale(el);
         case "expenses": return renderExpenses(el);
-        case "listings": return renderListings(el);
+        case "listings-ka": return renderListings(el, "kleinanzeigen");
+        case "listings-lbc": return renderListings(el, "leboncoin");
         case "orders": return renderOrders(el);
         case "customers": return renderCustomers(el);
         case "inventory": return renderInventory(el);
@@ -1376,37 +1379,41 @@
     let lstPageOffset = 0;
     const LST_PAGE_SIZE = 15;
     let _lstFilter = 'all'; // all, active, sold, expired
+    let _lstPlatform = ''; // kleinanzeigen or leboncoin
 
-    async function renderListings(el) {
+    async function renderListings(el, platform) {
+      _lstPlatform = platform;
       el.innerHTML = `<div style="display:flex;justify-content:center;padding:20px"><span class="pulse" style="color:var(--text-tertiary)">Loading...</span></div>`;
       lstPageOffset = 0;
       _lstFilter = 'all';
       let allListings = [];
-      try { const r = await apiFetch("/api/listings/?limit=500"); allListings = Array.isArray(r) ? r : []; } catch(e) {}
+      try { const r = await apiFetch("/api/listings/?limit=500&platform=" + platform); allListings = Array.isArray(r) ? r : []; } catch(e) {}
       window._lstData = allListings;
 
       const active = allListings.filter(l => l.status === 'active').length;
       const sold = allListings.filter(l => l.status === 'sold').length;
-      const kaCount = allListings.filter(l => l.platform === 'kleinanzeigen').length;
-      const lbcCount = allListings.filter(l => l.platform === 'leboncoin').length;
+      const expired = allListings.filter(l => l.status === 'expired').length;
+
+      const isKA = platform === 'kleinanzeigen';
+      const platformLabel = isKA ? 'Kleinanzeigen' : 'Leboncoin';
+      const platformColor = isKA ? '#86b817' : '#ff6e14';
+      const syncBtn = isKA
+        ? `<button class="rs-submit" id="lst-sync-btn" onclick="lstSyncKleinanzeigen()" style="font-size:14px;padding:12px;width:100%">Sync from Kleinanzeigen</button>`
+        : `<button class="rs-submit" id="lst-sync-lbc-btn" onclick="lstShowBookmarklet()" style="font-size:14px;padding:12px;width:100%;background:#ff6e14">Sync from Leboncoin</button>`;
 
       el.innerHTML = `
         <div class="rs-page fade-in">
           <div class="rs-stats-grid" id="lst-stats-grid">
-            <div class="rs-stat-card"><div class="rs-stat-value">${allListings.length}</div><div class="rs-stat-label">Total</div></div>
+            <div class="rs-stat-card"><div class="rs-stat-value" style="color:${platformColor}">${allListings.length}</div><div class="rs-stat-label">Total</div></div>
             <div class="rs-stat-card"><div class="rs-stat-value" style="color:#8BC34A">${active}</div><div class="rs-stat-label">Active</div></div>
             <div class="rs-stat-card"><div class="rs-stat-value" style="color:#ff6b6b">${sold}</div><div class="rs-stat-label">Sold</div></div>
-            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#86b817">${kaCount}</div><div class="rs-stat-label">Kleinanzeigen</div></div>
-            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#ff6e14">${lbcCount}</div><div class="rs-stat-label">Leboncoin</div></div>
+            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#888">${expired}</div><div class="rs-stat-label">Expired</div></div>
           </div>
 
-          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-            <button class="rs-submit" id="lst-sync-btn" onclick="lstSyncKleinanzeigen()" style="font-size:14px;padding:12px;flex:1;min-width:180px">Sync Kleinanzeigen</button>
-            <button class="rs-submit" id="lst-sync-lbc-btn" onclick="lstShowBookmarklet()" style="font-size:14px;padding:12px;flex:1;min-width:180px;background:#ff6e14">Sync Leboncoin</button>
-          </div>
+          ${syncBtn}
           <div id="lst-sync-status" style="display:none;text-align:center;padding:8px;margin-bottom:12px;font-size:13px;color:var(--text-tertiary)"></div>
 
-          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;margin-top:16px">
             <button class="rs-chart-pill active" data-lstf="all" onclick="lstSetFilter(this)">All</button>
             <button class="rs-chart-pill" data-lstf="active" onclick="lstSetFilter(this)">Active</button>
             <button class="rs-chart-pill" data-lstf="sold" onclick="lstSetFilter(this)">Sold</button>
@@ -1417,9 +1424,9 @@
 
           <div class="rs-recent">
             <div class="rs-recent-header">
-              <h3>Listings</h3>
+              <h3>${platformLabel}</h3>
               <span class="rs-total-badge" id="lst-total-badge">${allListings.length} listings</span>
-              <button class="rs-download-btn" onclick="lstDownloadExcel()" title="Download all listings as Excel">&#x2B07; Excel</button>
+              <button class="rs-download-btn" onclick="lstDownloadExcel()" title="Download as Excel">&#x2B07; Excel</button>
             </div>
             <div id="lst-list"></div>
             <div id="lst-pagination" style="display:flex;justify-content:center;gap:12px;padding:16px 0"></div>
@@ -1473,7 +1480,7 @@
       if (!listEl) return;
 
       if (filtered.length === 0) {
-        listEl.innerHTML = '<div class="rs-empty">' + (_lstFilter !== 'all' || window._lstSearchQuery ? 'No match' : 'No listings yet — they appear here when you use the Kleinanzeigen or Leboncoin tool') + '</div>';
+        listEl.innerHTML = '<div class="rs-empty">' + (_lstFilter !== 'all' || window._lstSearchQuery ? 'No match' : 'No listings yet — use the Sync button above') + '</div>';
         pagEl.innerHTML = '';
         return;
       }
@@ -1597,7 +1604,7 @@
         status.textContent = `Found ${data.found_on_ka} ads on KA — ${data.added} new, ${data.already_tracked} already tracked, ${data.expired} expired`;
 
         // Refresh list
-        const r = await apiFetch("/api/listings/?limit=500");
+        const r = await apiFetch("/api/listings/?limit=500&platform=kleinanzeigen");
         window._lstData = Array.isArray(r) ? r : [];
         document.getElementById("lst-total-badge").textContent = window._lstData.length + ' listings';
         lstPageOffset = 0;
@@ -1633,7 +1640,7 @@
         status.textContent = `LBC: ${data.found_on_lbc} ads — ${data.added} new, ${data.already_tracked} tracked, ${data.expired} expired`;
 
         // Refresh list
-        const r = await apiFetch("/api/listings/?limit=500");
+        const r = await apiFetch("/api/listings/?limit=500&platform=leboncoin");
         window._lstData = Array.isArray(r) ? r : [];
         document.getElementById("lst-total-badge").textContent = window._lstData.length + ' listings';
         lstPageOffset = 0;

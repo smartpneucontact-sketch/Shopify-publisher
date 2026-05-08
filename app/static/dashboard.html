@@ -1466,6 +1466,8 @@
             <div id="lst-list"></div>
             <div id="lst-pagination" style="display:flex;justify-content:center;gap:12px;padding:16px 0"></div>
           </div>
+
+          <div id="lst-to-remove"></div>
         </div>
       `;
 
@@ -1560,6 +1562,39 @@
         `;
       } else {
         pagEl.innerHTML = '';
+      }
+
+      /* "To Remove" section — active listings whose SKU is in sales report */
+      const rmEl = document.getElementById("lst-to-remove");
+      if (rmEl) {
+        const toRemove = (window._lstData || []).filter(l => l.status === 'active' && l.sku && window._lstSoldSkus[l.sku]);
+        if (!toRemove.length) { rmEl.innerHTML = ''; } else {
+          rmEl.innerHTML = `
+            <div class="rs-recent" style="margin-top:24px;border:2px solid #ff4444;border-radius:12px">
+              <div class="rs-recent-header"><h3 style="color:#ff4444">To Remove (${toRemove.length})</h3></div>
+              <div>${toRemove.map(l => {
+                const s = window._lstSoldSkus[l.sku];
+                const soldDate = s.sold_at ? new Date(s.sold_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}) : '';
+                const soldCh = s.channel || '';
+                return `<div class="rs-sale-row" style="border-left:3px solid #ff4444">
+                  <div class="rs-sale-line1">
+                    <span class="rs-sale-sku">${l.sku}</span>
+                    <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#ff4444;color:#fff;font-weight:600">SOLD</span>
+                    <span style="font-size:11px;color:var(--text-tertiary);margin-left:auto">sold ${soldDate}${soldCh ? ' via ' + soldCh : ''}</span>
+                  </div>
+                  <div class="rs-sale-line2">
+                    ${l.title ? '<span class="rs-sale-meta" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + l.title.slice(0,60) + '</span>' : ''}
+                    ${l.listing_url ? '<a href="' + l.listing_url + '" target="_blank" style="color:var(--accent);text-decoration:none;font-size:12px">open ↗</a>' : ''}
+                    <select style="font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer" onchange="lstChangeStatus('${l.id}',this.value)">
+                      <option value="active" selected>Active</option>
+                      <option value="sold">Sold</option>
+                      <option value="expired">Expired</option>
+                    </select>
+                  </div>
+                </div>`;
+              }).join('')}</div>
+            </div>`;
+        }
       }
     }
 

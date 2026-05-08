@@ -86,6 +86,35 @@ async def delete_listing(listing_id: int):
     return {"ok": True}
 
 
+# ── Sold SKUs (cross-reference with sales) ─────────────────────────
+
+@router.get("/sold-skus")
+async def get_sold_skus():
+    """
+    Return all distinct SKUs from the sales table.
+    Used by listing pages to flag items that have been sold.
+    """
+    try:
+        all_sales = await sales_db.get_sales(
+            channel=None, start_date=None, end_date=None,
+            sku=None, limit=10000, offset=0,
+        )
+        sold = {}
+        for s in all_sales:
+            sku = s.get("sku", "")
+            if sku and not sku.startswith("NOSSKU-"):
+                if sku not in sold:
+                    sold[sku] = {
+                        "sku": sku,
+                        "channel": s.get("channel", ""),
+                        "sold_at": s.get("sold_at", ""),
+                    }
+        return {"sold_skus": list(sold.values())}
+    except Exception as e:
+        logger.exception("Failed to fetch sold SKUs")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Kleinanzeigen Scraper ───────────────────────────────────────────
 
 @router.get("/scrape-test")

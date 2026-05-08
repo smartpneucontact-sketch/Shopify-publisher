@@ -967,6 +967,15 @@
       }
       if (el.dataset.rv != myRv) return;
 
+      // Fetch sold SKUs for cross-reference
+      let ebaySoldSkus = {};
+      try {
+        const sr = await apiFetch("/api/listings/sold-skus");
+        (sr.sold_skus || []).forEach(s => { ebaySoldSkus[s.sku] = s; });
+      } catch(e) {}
+      if (el.dataset.rv != myRv) return;
+      window._ebaySoldSkus = ebaySoldSkus;
+
       // Build flat rows
       const rows = [];
       state.products.forEach(p => {
@@ -1126,6 +1135,7 @@
                   <th>Qty</th>
                   <th>Web</th>
                   <th>eBay</th>
+                  <th>Sale</th>
                 </tr></thead>
                 <tbody>
                   ${rows.map(r => {
@@ -1146,6 +1156,7 @@
                       <td class="mono">${qty}</td>
                       <td><span class="web-status-badge ${ws.cls}">${ws.icon} ${ws.label}</span></td>
                       <td>${ebayBadge}</td>
+                      <td>${ebaySoldSkus[r.sku] ? '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#ff4444;color:#fff;font-weight:600">SOLD</span>' : ''}</td>
                     </tr>`;
                   }).join("")}
                 </tbody>
@@ -1404,14 +1415,21 @@
       _lstPlatform = platform;
       el.innerHTML = `<div style="display:flex;justify-content:center;padding:20px"><span class="pulse" style="color:var(--text-tertiary)">Loading...</span></div>`;
       lstPageOffset = 0;
-      _lstFilter = 'all';
+      _lstFilter = 'active';
       let allListings = [];
       try { const r = await apiFetch("/api/listings/?limit=500&platform=" + platform); allListings = Array.isArray(r) ? r : []; } catch(e) {}
+      /* Fetch sold SKUs from sales report */
+      window._lstSoldSkus = {};
+      try {
+        const sr = await apiFetch("/api/listings/sold-skus");
+        (sr.sold_skus || []).forEach(s => { window._lstSoldSkus[s.sku] = s; });
+      } catch(e) {}
       window._lstData = allListings;
 
       const active = allListings.filter(l => l.status === 'active').length;
       const sold = allListings.filter(l => l.status === 'sold').length;
       const expired = allListings.filter(l => l.status === 'expired').length;
+      const soldActive = allListings.filter(l => l.status === 'active' && l.sku && window._lstSoldSkus[l.sku]).length;
 
       const isKA = platform === 'kleinanzeigen';
       const platformLabel = isKA ? 'Kleinanzeigen' : 'Leboncoin';
@@ -1423,10 +1441,9 @@
       el.innerHTML = `
         <div class="rs-page fade-in">
           <div class="rs-stats-grid" id="lst-stats-grid">
-            <div class="rs-stat-card"><div class="rs-stat-value" style="color:${platformColor}">${allListings.length}</div><div class="rs-stat-label">Total</div></div>
             <div class="rs-stat-card"><div class="rs-stat-value" style="color:#8BC34A">${active}</div><div class="rs-stat-label">Active</div></div>
-            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#ff6b6b">${sold}</div><div class="rs-stat-label">Sold</div></div>
-            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#888">${expired}</div><div class="rs-stat-label">Expired</div></div>
+            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#ff4444">${soldActive}</div><div class="rs-stat-label">To Remove</div></div>
+            <div class="rs-stat-card"><div class="rs-stat-value" style="color:#888">${sold + expired}</div><div class="rs-stat-label">Archive</div></div>
           </div>
 
           ${syncBtn}
@@ -1434,10 +1451,8 @@
           <div id="lst-sync-status" style="display:none;text-align:center;padding:8px;margin-bottom:12px;font-size:13px;color:var(--text-tertiary)"></div>
 
           <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;margin-top:16px">
-            <button class="rs-chart-pill active" data-lstf="all" onclick="lstSetFilter(this)">All</button>
-            <button class="rs-chart-pill" data-lstf="active" onclick="lstSetFilter(this)">Active</button>
-            <button class="rs-chart-pill" data-lstf="sold" onclick="lstSetFilter(this)">Sold</button>
-            <button class="rs-chart-pill" data-lstf="expired" onclick="lstSetFilter(this)">Expired</button>
+            <button class="rs-chart-pill active" data-lstf="active" onclick="lstSetFilter(this)">Active</button>
+            <button class="rs-chart-pill" data-lstf="archive" onclick="lstSetFilter(this)">Archive</button>
           </div>
 
           <input type="text" id="lst-search" class="rs-search" placeholder="Search SKU..." inputmode="numeric" oninput="lstOnSearch(this)">
@@ -1459,7 +1474,8 @@
 
     function lstGetFiltered() {
       let data = window._lstData || [];
-      if (_lstFilter !== 'all') data = data.filter(l => l.status === _lstFilter);
+      if (_lstFilter === 'active') data = data.filter(l => l.status === 'active');
+      else if (_lstFilter === 'archive') data = data.filter(l => l.status === 'sold' || l.status === 'expired');
       const q = (window._lstSearchQuery || '').trim().toLowerCase();
       if (q) data = data.filter(l => (l.sku || '').toLowerCase().includes(q));
       return data;
@@ -1500,15 +1516,22 @@
       if (!listEl) return;
 
       if (filtered.length === 0) {
-        listEl.innerHTML = '<div class="rs-empty">' + (_lstFilter !== 'all' || window._lstSearchQuery ? 'No match' : 'No listings yet — use the Sync button above') + '</div>';
+        listEl.innerHTML = '<div class="rs-empty">' + (_lstFilter === 'archive' ? 'No archived listings' : (window._lstSearchQuery ? 'No match' : 'No listings yet — use the Sync button above')) + '</div>';
         pagEl.innerHTML = '';
         return;
       }
 
-      listEl.innerHTML = page.map(l => `
-        <div class="rs-sale-row" id="lst-row-${l.id}">
+      listEl.innerHTML = page.map(l => {
+        const soldInfo = (l.sku && window._lstSoldSkus[l.sku]) ? window._lstSoldSkus[l.sku] : null;
+        const isSoldActive = soldInfo && l.status === 'active';
+        const soldBadge = isSoldActive
+          ? '<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#ff4444;color:#fff;font-weight:600;animation:pulse 2s infinite">SOLD \u2014 remove listing</span>'
+          : (soldInfo ? '<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:#ff444422;color:#ff6b6b">sold</span>' : '');
+        return `
+        <div class="rs-sale-row" id="lst-row-${l.id}" style="${isSoldActive ? 'border-left:3px solid #ff4444;' : ''}">
           <div class="rs-sale-line1">
             <span class="rs-sale-sku">${l.sku || '\u2014'}</span>
+            ${soldBadge}
             <span class="rs-sale-price">${l.price ? l.price.toFixed(2) + ' \u20AC' : '\u2014'}</span>
             <button class="rs-del-btn" onclick="lstDelete('${l.id}', this)" title="Delete">\u2715</button>
           </div>
@@ -1524,8 +1547,8 @@
               <option value="expired" ${l.status === 'expired' ? 'selected' : ''}>Expired</option>
             </select>
           </div>
-        </div>
-      `).join("");
+        </div>`;
+      }).join("");
 
       const totalPages = Math.ceil(filtered.length / LST_PAGE_SIZE);
       const currentPage = Math.floor(lstPageOffset / LST_PAGE_SIZE) + 1;
